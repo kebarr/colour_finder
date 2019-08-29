@@ -15,24 +15,30 @@ filename = "ImagesHEforKatie/R6-S1-2019-08-12T10-04-01.mrxs"
 class DamagedRegionFinder(object):
         def __init__(self, filename):
                 self.filename = filename
+                self.prepare()
+                print("initialised slide")
+                self.regions_found = 0
 
-        def get_image_for_analysis(self, region_y, region_x, len_y=24, len_x=10.5):
+        def prepare(self):
                 os = openslide.OpenSlide(self.filename)
                 images = os.associated_images
                 image = images['macro'] # full image without cross hatching on thumbnail
                 image = image.convert("RGB") # need full rgb as lose detail in greyscale
-                im_array = np.array(image)
+                self.im_array = np.array(image)
+
+        def get_image_for_analysis(self, region_y, region_x, len_y=24, len_x=10.5):
                 # image is 24cm, 1st layer (down), is 2-5sm, 6.7-9.9cm, 12-15, 17.5-20.1, 21- 24, 
                 # across: 10.5cm, 1st col, 1.5 -45, second 4.8-8
                 # image size is (1458, 3308)
-                scale_factor_y = im_array.shape[0]/len_y
-                scale_factor_x = im_array.shape[1]/len_x
-                test_sample = im_array[int(scale_factor_y*region_y[0]):int(scale_factor_y*region_y[1]), int(scale_factor_x*region_x[0]):int(scale_factor_x*region_x[1])]
+                print(self.im_array.shape[0], len_y, region_y, region_x)
+                scale_factor_y = self.im_array.shape[0]/len_y
+                scale_factor_x = self.im_array.shape[1]/len_x
+                test_sample = self.im_array[int(scale_factor_y*region_y[0]):int(scale_factor_y*region_y[1])-1, int(scale_factor_x*region_x[0]):int(scale_factor_x*region_x[1])-1]
                 test_image = Image.fromarray(test_sample)
-                blurred = np.array(get_blurred_image(test_image))
+                blurred = np.array(self.get_blurred_image(test_image))
                 return blurred
 
-        def get_blurred_image(self, image, kernel=kernel):
+        def get_blurred_image(self, image):
                 input_pixels = image.load()
                 kernel = np.array([np.array([1/81 for i in range(9)]) for j in range(9)])
                 offset = len(kernel) // 2
@@ -42,17 +48,17 @@ class DamagedRegionFinder(object):
                 # Compute convolution between intensity and kernels
                 for x in range(offset, image.width - offset):
                         for y in range(offset, image.height - offset):
-                        acc = [0, 0, 0]
-                        for a in range(len(kernel)):
-                                for b in range(len(kernel)):
-                                xn = x + a - offset
-                                yn = y + b - offset
-                                pixel = input_pixels[xn, yn]
-                                acc[0] += pixel[0] * kernel[a][b]
-                                acc[1] += pixel[1] * kernel[a][b]
-                                acc[2] += pixel[2] * kernel[a][b]
+                                acc = [0, 0, 0]
+                                for a in range(len(kernel)):
+                                        for b in range(len(kernel)):
+                                                xn = x + a - offset
+                                                yn = y + b - offset
+                                                pixel = input_pixels[xn, yn]
+                                                acc[0] += pixel[0] * kernel[a][b]
+                                                acc[1] += pixel[1] * kernel[a][b]
+                                                acc[2] += pixel[2] * kernel[a][b]
 
-                        draw.point((x, y), (int(acc[0]), int(acc[1]), int(acc[2])))
+                                draw.point((x, y), (int(acc[0]), int(acc[1]), int(acc[2])))
                 return output_image
 
 
@@ -66,8 +72,8 @@ class DamagedRegionFinder(object):
                 res = np.zeros((image_array.shape[0], image_array.shape[1]))
                 for i in range(len(image_array)):
                         for j in range(len(image_array[1])):
-                        res[i][j] = filter(image_array[i][j])
-                return remove_edges(res)
+                                res[i][j] = filter(image_array[i][j])
+                return self.remove_edges(res)
 
 
         # so now just need total nonzero pixels, and total pixels found
@@ -76,20 +82,48 @@ class DamagedRegionFinder(object):
                 sample = np.zeros((image.shape[0], image.shape[1]))
                 for i in range(len(image)):
                         for j in range(len(image[1])):
-                        sample[i][j] = filter_sample(arr[i][j])
+                                sample[i][j] = filter_sample(image[i][j])
                 return sample
 
         def run(self, region_y, region_x):
-                image = get_image_for_analysis(self.filename, (6.7, 9.9), (1.5, 4.5))
+                # break this up so don't reload each time
+                image = self.get_image_for_analysis(region_y, region_x)
                 print("opened image")
                 image_arr = np.array(image)
-                sample_region = get_sample(image_arr)
-                damaged_region = find_damaged_region(image_arr)
+                sample_region = self.get_sample(image_arr)
+                damaged_region = self.find_damaged_region(image_arr)
                 damaged_area = np.sum(damaged_region)/np.sum(sample_region)
                 plt.imshow(damaged_region)
-                filename_base = self.filename.split(".")[0]
-                plt.savefig("damaged_"+ filename_base)
+                if '/' in self.filename:
+                        filename_base = self.filename.split("/")[1].split(".")[0]
+                else:
+                        filename_base = self.filename.split(".")[0]
+                plt.savefig("damaged_"+ str(self.regions_found) + filename_base)
                 plt.imshow(sample_region)
-                plt.savefig("sample_" + filename_base)
+                plt.savefig("sample_" + str(self.regions_found) +  filename_base)
+                self.regions_found += 1
+                print("Area of: %s region %d : %d, %d:%d is %f" % (self.filename, region_y[0], region_y[1], region_x[0], region_x[1], damaged_area))
 
-                
+
+files = os.listdir("mrxs_fileshistologyheart_tissue")
+# need to define regions, not necessarily exactly same for each so make as big as possible
+# image is 24cm, 1st layer (down), is 2-5sm, 6.7-9.9cm, 12-15, 17.5-20.1, 21- 24, 
+# across: 10.5cm, 1st col, 1.5 -45, second 4.8-8
+
+# so do 1-4.6 and 4.7-9 for columns
+# rows: 1.5 - 5.9, 6-10.9,11-16.3,16.4-20.5,20.6-24
+
+regions = [[(1, 4.6), (1.5, 5.9)], [(1, 4.6), (6,10.9)], [(1, 4.6), (11, 16.3)], [(1, 4.6), (16.4,20.5)], [(1, 4.6), (20.6, 24)], [(4.7, 9), (1.5, 5.9)], [(4.7, 9), (6,10.9)], [(4.7, 9), (11, 16.3)], [(4.7, 9), (16.4,20.5)], [(4.7, 9), (20.6, 24)]]
+drf = DamagedRegionFinder("mrxs_fileshistologyheart_tissue/" + files[0]) # for this one i get unsupported image format error
+drf = DamagedRegionFinder('ImagesHEforKatie/R6-S1-2019-08-12T10-04-01.mrxs')
+for region in regions:
+        drf.run(region[0], region[1])
+
+# for first, column delimitation is wrong, need to increase column 2 width
+drfs = []
+for file in files:
+        print(file)
+        try:
+                drfs.append(DamagedRegionFinder("mrxs_fileshistologyheart_tissue/" + file))
+        except:
+                print("could not read")
