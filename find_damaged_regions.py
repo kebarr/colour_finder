@@ -5,6 +5,8 @@ from scipy.ndimage.morphology import binary_erosion
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+from scipy import fftpack
+
 
 # file format is mrxs, which is a virtual slide, first need to open it and get the data
 
@@ -35,30 +37,21 @@ class DamagedRegionFinder(object):
                 scale_factor_x = self.im_array.shape[1]/len_x
                 test_sample = self.im_array[int(scale_factor_y*region_y[0]):int(scale_factor_y*region_y[1])-1, int(scale_factor_x*region_x[0]):int(scale_factor_x*region_x[1])-1]
                 test_image = Image.fromarray(test_sample)
-                blurred = np.array(self.get_blurred_image(test_image))
+                blurred = self.get_blurred_image(test_image)
                 return blurred
 
         def get_blurred_image(self, image):
-                input_pixels = image.load()
                 kernel = np.array([np.array([1/81 for i in range(9)]) for j in range(9)])
                 offset = len(kernel) // 2
-                output_image = Image.new("RGB", image.size)
-                draw = ImageDraw.Draw(output_image)
-                # slooow- look at https://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.ndimage.filters.convolve.html
-                # Compute convolution between intensity and kernels
-                for x in range(offset, image.width - offset):
-                        for y in range(offset, image.height - offset):
-                                acc = [0, 0, 0]
-                                for a in range(len(kernel)):
-                                        for b in range(len(kernel)):
-                                                xn = x + a - offset
-                                                yn = y + b - offset
-                                                pixel = input_pixels[xn, yn]
-                                                acc[0] += pixel[0] * kernel[a][b]
-                                                acc[1] += pixel[1] * kernel[a][b]
-                                                acc[2] += pixel[2] * kernel[a][b]
-
-                                draw.point((x, y), (int(acc[0]), int(acc[1]), int(acc[2])))
+                kernel_ft = fftpack.fft2(kernel, shape=np.array(image).shape[:2], axes=(0, 1))
+                # convolve
+                img_ft = fftpack.fft2(np.array(image), axes=(0, 1))
+                # the 'newaxis' is to match to color direction
+                img2_ft = kernel_ft[:, :, np.newaxis] * img_ft
+                img2 = fftpack.ifft2(img2_ft, axes=(0, 1)).real
+                # clip values to range
+                img2 = np.clip(img2, 0, 255)
+                output_image = img2.astype(int)
                 return output_image
 
 
@@ -113,12 +106,13 @@ files = os.listdir("mrxs_fileshistologyheart_tissue")
 # so do 1-4.6 and 4.7-9 for columns
 # rows: 1.5 - 5.9, 6-10.9,11-16.3,16.4-20.5,20.6-24
 
-regions = [[(1, 4.6), (1.5, 5.9)], [(1, 4.6), (6,10.9)], [(1, 4.6), (11, 16.3)], [(1, 4.6), (16.4,20.5)], [(1, 4.6), (20.6, 24)], [(4.7, 9), (1.5, 5.9)], [(4.7, 9), (6,10.9)], [(4.7, 9), (11, 16.3)], [(4.7, 9), (16.4,20.5)], [(4.7, 9), (20.6, 24)]]
+regions = [[(1, 4.2), (1.5, 5.9)], [(1, 4.2), (6,10.9)], [(1, 4.2), (11, 16.3)], [(1, 4.2), (16.4,20.5)], [(1, 4.2), (20.6, 24)], [(4.3, 9), (1.5, 5.9)], [(4.3, 9), (6,10.9)], [(4.3, 9), (11, 16.3)], [(4.3, 9), (16.4,20.5)], [(4.3, 9), (20.6, 24)]]
 drf = DamagedRegionFinder("mrxs_fileshistologyheart_tissue/" + files[0]) # for this one i get unsupported image format error
 drf = DamagedRegionFinder('ImagesHEforKatie/R6-S1-2019-08-12T10-04-01.mrxs')
 for region in regions:
-        drf.run(region[0], region[1])
+        drf.run(region[1], region[0])
 
+drf.run((11, 16.3), (1, 4.2))
 # for first, column delimitation is wrong, need to increase column 2 width
 drfs = []
 for file in files:
