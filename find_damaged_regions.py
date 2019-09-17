@@ -18,7 +18,7 @@ class DamagedRegionFinder(object):
         def __init__(self, filename):
                 self.filename = filename
                 self.prepare()
-                print("initialised slide")
+                print("initialised slide %s" % (filename))
                 self.regions_found = 0
 
         def prepare(self):
@@ -98,26 +98,23 @@ class DamagedRegionFinder(object):
                 print("Area of: %s region %d : %d, %d:%d is %f" % (self.filename, region_y[0], region_y[1], region_x[0], region_x[1], damaged_area))
 
 
-files = os.listdir("mrxs_fileshistologyheart_tissue")
+files = os.listdir("190816_MI_H&E")
+mrxs_files = [f for f in files if f.endswith(".mrxs")]
 # need to define regions, not necessarily exactly same for each so make as big as possible
 # image is 24cm, 1st layer (down), is 2-5sm, 6.7-9.9cm, 12-15, 17.5-20.1, 21- 24, 
 # across: 10.5cm, 1st col, 1.5 -45, second 4.8-8
-
 # so do 1-4.6 and 4.7-9 for columns
 # rows: 1.5 - 5.9, 6-10.9,11-16.3,16.4-20.5,20.6-24
 
-regions = [[(1, 4.2), (1.5, 5.9)], [(1, 4.2), (6,10.9)], [(1, 4.2), (11, 16.3)], [(1, 4.2), (16.4,20.5)], [(1, 4.2), (20.6, 24)], [(4.3, 9), (1.5, 5.9)], [(4.3, 9), (6,10.9)], [(4.3, 9), (11, 16.3)], [(4.3, 9), (16.4,20.5)], [(4.3, 9), (20.6, 24)]]
-drf = DamagedRegionFinder("mrxs_fileshistologyheart_tissue/" + files[0]) # for this one i get unsupported image format error
-drf = DamagedRegionFinder('ImagesHEforKatie/R6-S1-2019-08-12T10-04-01.mrxs')
-for region in regions:
-        drf.run(region[1], region[0])
+regions = [[(1, 4.4), (1.5, 5.9)], [(1, 4.4), (6,10.9)], [(1, 4.4), (11, 16.3)], [(1, 4.4), (16.4,20.5)], [(1, 4.4), (20.6, 24)], [(4.5, 9), (1.5, 5.9)], [(4.5, 9), (6,10.9)], [(4.5, 9), (11, 16.3)], [(4.5, 9), (16.4,20.5)], [(4.5, 9), (20.6, 24)]]
 
-drf.run((11, 16.3), (1, 4.2))
-# for first, column delimitation is wrong, need to increase column 2 width
 drfs = []
-for file in files:
+for file in mrxs_files:
         print(file)
         try:
-                drfs.append(DamagedRegionFinder("mrxs_fileshistologyheart_tissue/" + file))
+                drf = DamagedRegionFinder("190816_MI_H&E/" + file)
+                for region in regions:
+                        drf.run(region[1], region[0])
+                drfs.append(drf)
         except:
                 print("could not read")
