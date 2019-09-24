@@ -1,0 +1,204 @@
+import numpy as np
+from PIL import Image, ImageDraw
+from scipy.ndimage.morphology import binary_erosion, binary_opening, binary_closing
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+#import skimage
+from skimage.filters import sobel
+from skimage.morphology import watershed
+from skimage import measure
+from scipy.ndimage import median_filter
+from skimage.color import label2rgb
+import os
+
+
+def count_yellow(filename):
+    img = Image.open(filename)
+    img.load()
+    image_arr = np.array(img)
+    filter_match = lambda x: ((150<x[0]) & (115 < x[1]) & (x[2]<60))
+    match_arr = np.zeros((image_arr.shape[0], image_arr.shape[1]))
+    for i in range(len(image_arr)):
+            for j in range(len(image_arr[i])):
+                    if filter_match(image_arr[i][j]):
+                        image_arr[i][j] = np.array([40, 0, 250], dtype=np.uint8)
+                        match_arr[i, j] = 1
+    outfile = filename.split('.jpg')[0] + '_yellow.png'
+    filtered = median_filter(match_arr, size=3) # orignally done with size = 3
+    lbl = measure.label(filtered)
+    lbl_img = label2rgb(lbl, np.array(Image.open(filename).convert('L')))
+    plt.imshow(lbl_img)
+    plt.savefig(outfile)
+    res = count_cells(filtered, match_arr, outfile)
+    return res
+
+
+def get_gs_array(filename):
+    img_gs = Image.open(filename).convert('L')
+    img_gs.load()
+    return np.array(img_gs)
+
+def get_segmented_image(array, marker_lower, marker_upper):
+    plt.imshow(array)
+    plt.show()
+    markers = np.zeros_like(array)
+    markers[array < marker_lower] = 1
+    markers[array > marker_upper] = 2
+    elevation_map = sobel(array)
+    ws = watershed(elevation_map, markers)
+    return ws
+
+
+def count_cells(to_count, original_array, outfile, filter=False):
+    labels = measure.label(to_count)
+    if filter:
+        labels = skimage.morphology.remove_small_objects(labels, 10)
+    plt.imshow(labels)
+    plt.savefig(outfile)
+    props = measure.regionprops(labels, original_array)
+    euler_numbers = [p.euler_number for p in props[1:]]
+    # euler number of 1= no holes, 
+    total_cells = 0
+    for e in euler_numbers:
+        if e == 0 or e == 1:
+            total_cells += 1
+        else:
+            # euler number is 1 - number of holes, so number of cells is -euler_number + 1
+            total_cells += abs(e) + 1
+    return total_cells
+
+maria_images = os.listdir("../maria/count_cell_images")
+# need to pair up merge (yellow, green, red) images with IBA (green) images
+merge_images = sorted([im for im in maria_images if im.startswith('Merge')])
+iba_images = sorted([im for im in maria_images if im.startswith('IBA')])
+
+filename_green = '../maria/count_cell_images/' + iba_images[2]
+filename_yellow = '../maria/count_cell_images/' + merge_images[2]
+cells_yellow = count_yellow(filename_yellow)
+green_arr = get_gs_array(filename_green)
+green_segmented = get_segmented_image(green_arr, 30, 45)
+outfile = filename_green.split('.jpg')[0] + '_green.png'
+cells_green = count_cells(green_segmented, green_arr, outfile, True)
+final = 100*cells_yellow/cells_green
+print("for file %s, %d yellow cells, %d green cells, %f yellow out of green" % (filename_yellow, cells_yellow, cells_green, final))
+
+# small bits that have a corresponding nucleus (in dapi image) are to be counted
+# so get coordinates of each object (unfiltered) and compare to coordinates of dapi stained obects
+
+dapi_images = os.listdir("../maria/count_cell_images/dapi_staining")
+dapi_13 = "../maria/count_cell_images/dapi_staining/"+ dapi_images[3]
+
+# blue- anything where r and g are under 5 and blue is over 50?
+
+
+
+lbl_blue = count_blue(dapi_13)
+# iterate over green labels
+# if they are bigger than some size, use (major_axis_length?, filled_area?, equivalent_diameter?)
+# if not, find overlapping dapi stain- how?
+# can use slices from regionprops of dapi image in original green image
+# dapi_img[props[1].slice[0], props[1].slice[1]]
+# exclude overlapped green bits from further analysis to avoid double counting
+
+def get_labelled_image_green(array, marker_lower, marker_upper):
+    markers = np.zeros_like(array)
+    markers[array < marker_lower] = 1
+    markers[array > marker_upper] = 2
+    elevation_map = sobel(array)
+    ws = watershed(elevation_map, markers)
+    labels = measure.label(ws)
+    return labels
+
+
+green_arr = get_gs_array(filename_green)
+labels = get_labelled_image_green(green_arr, 30, 45)
+props = measure.regionprops(labels, green_arr)
+# tiny fleck
+prop = props[1000]
+# try major axis length of 10 as cut off
+props_small_regions = [p for p in props if p.major_axis_length < 7]
+props_big_regions = [p for p in props if p.major_axis_length >= 7]
+# need to visualise these on original image
+green_arr = get_gs_array(filename_green)
+for p in props_big_regions[1:]:
+    green_arr[p.slice[0], p.slice[1]] = 255
+
+
+plt.imshow(green_arr)
+plt.show()
+# sweet, now for each of props small regions, see if it overlaps a dapi stained region
+# can do this by using slice over the blue label image and checking whether its all equal to the background label colour
+
+def overlaps_dapi_region(prop, dapi_labels):
+    slice_in_dapi_labels = dapi_labels[prop.slice[0], prop.slice[1]]
+    if np.any(slice_in_dapi_labels != 0): # nonzero value corresponds to label!!
+        return set(slice_in_dapi_labels[np.where(slice_in_dapi_labels != 0)])
+    return set() 
+
+overlapping_dapi= set()
+for prop in props_small_regions:
+    res = overlaps_dapi_region(prop, lbl_blue)
+    overlapping_dapi = overlapping_dapi.union(res)
+
+len(overlapping_dapi)
+
+
+def count_blue(filename):
+    img = Image.open(filename)
+    img.load()
+    image_arr = np.array(img)
+    filter_match = lambda x: ((x[0]<30) & (x[1]< 60) & (80 < x[2]))
+    match_arr = np.zeros((image_arr.shape[0], image_arr.shape[1]))
+    for i in range(len(image_arr)):
+            for j in range(len(image_arr[i])):
+                    if filter_match(image_arr[i][j]):
+                        image_arr[i][j] = np.array([250, 250, 0], dtype=np.uint8)
+                        match_arr[i, j] = 1
+    lbl = measure.label(match_arr)
+    return lbl
+
+def count_cells(props):
+    euler_numbers = [p.euler_number for p in props[1:]]
+    # euler number of 1= no holes, 
+    total_cells = 0
+    for e in euler_numbers:
+        if e == 0 or e == 1:
+            total_cells += 1
+        else:
+            # euler number is 1 - number of holes, so number of cells is -euler_number + 1
+            total_cells += abs(e) + 1
+    return total_cells
+
+
+# actually try not splitting, as big ones should have single nucleus for each
+def count_green_inc_dapi(filename_green, filename_blue):
+    lbl_blue = count_blue(filename_blue)
+    plt.imshow(lbl_blue)
+    print("%d blue dots found" % (len(lbl_blue)))
+    plt.savefig(filename_blue.split("jpg")[0] + '_found.png')
+    green_arr = get_gs_array(filename_green)
+    labels = get_labelled_image_green(green_arr, 30, 50)
+    print("labelled green array")
+    props = measure.regionprops(labels, green_arr)
+    props_small_regions = [p for p in props if p.major_axis_length < 7]
+    props_big_regions = [p for p in props if p.major_axis_length >= 7]
+    overlapping_dapi= set()
+    for prop in props_small_regions:
+        res = overlaps_dapi_region(prop, lbl_blue)
+        overlapping_dapi = overlapping_dapi.union(res)
+    number_large_cells = count_cells(props_big_regions)
+    print("found %d green cells in %s"% (len(overlapping_dapi)+number_large_cells, filename_green))
+
+# so now need to repeat that for all of them
+#dapi_images = sorted(os.listdir("../maria/count_cell_images/dapi_staining"))[1:]
+#iba_images = sorted([im for im in maria_images if im.startswith('IBA') and im.endswith('jpg')])
+
+for i in range(len(iba_images)):
+    iba_filename = "../maria/count_cell_images/" + iba_images[i]
+    dapi_filename = "../maria/count_cell_images/dapi_staining/" + dapi_images[i]
+    count_green_inc_dapi(iba_filename, dapi_filename)
+
+# using 50 as fial arg to green segmentation fn gives best results
+
+
