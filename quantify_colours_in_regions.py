@@ -24,7 +24,7 @@ image_arr = np.array(img)
 # now got matts so will try that.....
 matt_test_image = 'MAX_Iba1.tif'
 
-matt_test_image = 'matt_iba1_smaller.png'
+matt_test_image = 'matt/matt_iba1_smaller.png'
 img = Image.open(matt_test_image).convert('L')
 img.load()
 image_arr = np.array(img)
@@ -76,7 +76,7 @@ props = measure.regionprops(labels_filtered, image_arr)
 
 # just try...... much better!! and faster!
 markers = np.zeros_like(image_arr)
-markers[image_arr < 20] = 1
+markers[image_arr < 80] = 1
 labels = measure.label(markers)
 plt.imshow(labels)
 plt.show()
@@ -84,8 +84,8 @@ labels_filtered = skimage.morphology.remove_small_objects(labels, 500)
 plt.imshow(labels_filtered)
 plt.show()
 labels_final = measure.label(skimage.morphology.remove_small_holes(labels_filtered, 5000))
-#plt.imshow(labels_final)
-#plt.show()
+plt.imshow(labels_final)
+plt.show()
 props = measure.regionprops(labels_filtered, image_arr)
 injection_site = props[1]
 injection_site_coords = injection_site.coords
@@ -117,8 +117,36 @@ for i in range(1, int(iterations_needed/4)):
 
 # so basic idea works.... now just need to locate starting point for all images
 # then set up scripts to throw on cluster
+# take 10th from stack
 
+# idea to automate finding middle- injection site is surrounded by fluorescence
+# other dark sites are not
 
+# stack is 18, so take 9
+
+markers = np.zeros_like(image_arr)
+markers[image_arr < 80] = 1
+labels = measure.label(markers)
+plt.imshow(labels)
+plt.show()
+labels_filtered = skimage.morphology.remove_small_objects(labels, 500)
+plt.imshow(labels_filtered)
+plt.show()
+labels_final = measure.label(skimage.morphology.remove_small_holes(labels_filtered, 5000))
+plt.imshow(labels_final)
+plt.show()
+props = measure.regionprops(labels_final, image_arr)
+# exclude label for entirey of image
+entire_area = image_arr.shape[0]*image_arr.shape[1]
+filtered = [p for p in props if p.area < 0.5*entire_area]
+# select one that is closest to middle
+middle_x = image_arr.shape[0]/2
+middle_y = image_arr.shape[1]/2
+center = np.array([middle_x, middle_y])
+centroids =[np.array(p.centroid) for p in filtered]
+dists = [np.linalg.norm(c-center) for c in centroids]
+index_for_injection_site = np.where(dists == np.amin(dists))[0][0]
+injection_site = filtered[index_for_injection_site]
 
 
 
