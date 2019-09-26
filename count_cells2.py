@@ -148,13 +148,17 @@ def count_blue(filename):
     img = Image.open(filename)
     img.load()
     image_arr = np.array(img)
-    filter_match = lambda x: ((x[0]<30) & (x[1]< 60) & (80 < x[2]))
+    #plt.imshow(image_arr)
+    #plt.show()
+    filter_match = lambda x: ((x[0]<30) & (x[1]< 40) & (80 < x[2]<255) | (x[0]<4) & (x[1]< 4) & (30 < x[2]<255) )
     match_arr = np.zeros((image_arr.shape[0], image_arr.shape[1]))
     for i in range(len(image_arr)):
             for j in range(len(image_arr[i])):
                     if filter_match(image_arr[i][j]):
                         image_arr[i][j] = np.array([250, 250, 0], dtype=np.uint8)
                         match_arr[i, j] = 1
+    #plt.imshow(image_arr)
+    #plt.show()
     lbl = measure.label(match_arr)
     return lbl
 
@@ -178,16 +182,20 @@ def count_green_inc_dapi(filename_green, filename_blue):
     print("%d blue dots found" % (len(lbl_blue)))
     plt.savefig(filename_blue.split("jpg")[0] + '_found.png')
     green_arr = get_gs_array(filename_green)
-    labels = get_labelled_image_green(green_arr, 30, 50)
-    print("labelled green array")
+    labels = get_labelled_image_green(green_arr, 30, 45)
+    plt.imshow(labels)
+    plt.show()
     props = measure.regionprops(labels, green_arr)
-    props_small_regions = [p for p in props if p.major_axis_length < 7]
-    props_big_regions = [p for p in props if p.major_axis_length >= 7]
+    props_small_regions = [p for p in props if p.major_axis_length < 6]
+    props_big_regions = [p for p in props if p.major_axis_length >= 6]
+    print("small: ", len(props_small_regions))
+    print("big: ", len(props_big_regions))
     overlapping_dapi= set()
     for prop in props_small_regions:
         res = overlaps_dapi_region(prop, lbl_blue)
         overlapping_dapi = overlapping_dapi.union(res)
     number_large_cells = count_cells(props_big_regions)
+    print("%d large cells found" % number_large_cells)
     print("found %d green cells in %s"% (len(overlapping_dapi)+number_large_cells, filename_green))
 
 # so now need to repeat that for all of them
@@ -201,4 +209,20 @@ for i in range(len(iba_images)):
 
 # using 50 as fial arg to green segmentation fn gives best results
 
+# 3.2 messes it up cos htere's some very light patches, which are dead cells, exclude these
 
+td = "../maria/count_cell_images/dapi_staining/" +dapi_images[-2]
+ti = "../maria/count_cell_images/" + iba_images[-2]
+img = Image.open(td)
+img.load()
+image_arr = np.array(img)
+count_green_inc_dapi(ti, td)
+### best results so far:(green_arr, 30, 45) and major axis length 6
+# found 523 green cells in ../maria/count_cell_images/IBA1-1.2.jpg
+# found 341 green cells in ../maria/count_cell_images/IBA1-1.3.jpg
+# found 462 green cells in ../maria/count_cell_images/IBA1-2.1.jpg
+# found 530 green cells in ../maria/count_cell_images/IBA1-2.2.jpg
+# found 463 green cells in ../maria/count_cell_images/IBA1-2.3.jpg
+# found 400 green cells in ../maria/count_cell_images/IBA1-3.1.jpg
+# found 310 green cells in ../maria/count_cell_images/IBA1-3.2.jpg
+# found 344 green cells in ../maria/count_cell_images/IBA1-3.3.jpg
