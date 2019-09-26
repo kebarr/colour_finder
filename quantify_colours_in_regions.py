@@ -100,7 +100,6 @@ masked = np.ma.masked_array(image_arr,mask)
 # then
 np.sum(masked)
 
-struct = np.ones((2,2))
 mask = np.zeros_like(image_arr)
 for x, y in injection_site_coords:
     mask[x,y] = 1
@@ -110,10 +109,14 @@ sums = []
 for i in range(1, int(iterations_needed/4)):
     masked = np.ma.masked_array(image_arr,mask)
     sums.append(np.sum(masked))
-    mask = binary_dilation(mask)
+    mask = binary_dilation(mask, iterations=4)
     print(np.sum(mask), " sum outside mask: ", sums[-1])
     plt.imshow(mask[150:350, 200:400])
     plt.show()
+
+
+# so basic idea works.... now just need to locate starting point for all images
+# then set up scripts to throw on cluster
 
 
 
