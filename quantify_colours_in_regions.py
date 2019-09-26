@@ -189,3 +189,7 @@ intensities = compare_intensities(image_arr, injection_site)
 # rest show expected trend
 
 
+image_arr =open_image("matt_neun_smaller.png")
+injection_site = get_injection_site_props(image_arr)
+intensities = compare_intensities(image_arr, injection_site)
+
