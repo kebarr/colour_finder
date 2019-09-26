@@ -104,14 +104,14 @@ mask = np.zeros_like(image_arr)
 for x, y in injection_site_coords:
     mask[x,y] = 1
 # eed to work out smallest ditance outwards- use bbox
-iterations_needed = np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))
+iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/4)
 sums = []
-for i in range(1, int(iterations_needed/4)):
+for i in range(1, iterations_needed):
     masked = np.ma.masked_array(image_arr,mask)
     sums.append(np.sum(masked))
     mask = binary_dilation(mask, iterations=4)
-    print(np.sum(mask), " sum outside mask: ", sums[-1])
-    plt.imshow(mask[150:350, 200:400])
+    print("i: ", i, " ", np.sum(mask), " sum outside mask: ", sums[-1])
+    plt.imshow(mask)
     plt.show()
 
 
@@ -124,29 +124,68 @@ for i in range(1, int(iterations_needed/4)):
 
 # stack is 18, so take 9
 
-markers = np.zeros_like(image_arr)
-markers[image_arr < 80] = 1
-labels = measure.label(markers)
-plt.imshow(labels)
-plt.show()
-labels_filtered = skimage.morphology.remove_small_objects(labels, 500)
-plt.imshow(labels_filtered)
-plt.show()
-labels_final = measure.label(skimage.morphology.remove_small_holes(labels_filtered, 5000))
-plt.imshow(labels_final)
-plt.show()
-props = measure.regionprops(labels_final, image_arr)
-# exclude label for entirey of image
-entire_area = image_arr.shape[0]*image_arr.shape[1]
-filtered = [p for p in props if p.area < 0.5*entire_area]
-# select one that is closest to middle
-middle_x = image_arr.shape[0]/2
-middle_y = image_arr.shape[1]/2
-center = np.array([middle_x, middle_y])
-centroids =[np.array(p.centroid) for p in filtered]
-dists = [np.linalg.norm(c-center) for c in centroids]
-index_for_injection_site = np.where(dists == np.amin(dists))[0][0]
-injection_site = filtered[index_for_injection_site]
+def open_image(filename):
+    img = Image.open(matt_test_image).convert('L')
+    img.load()
+    return np.array(img)
 
+def get_injection_site_props(image_arr):
+    markers = np.zeros_like(image_arr)
+    markers[image_arr < 80] = 1
+    labels = measure.label(markers)
+    labels_filtered = skimage.morphology.remove_small_objects(labels, 500)
+    labels_final = measure.label(skimage.morphology.remove_small_holes(labels_filtered, 5000))
+    props = measure.regionprops(labels_final, image_arr)
+    # exclude label for entirey of image
+    entire_area = image_arr.shape[0]*image_arr.shape[1]
+    filtered = [p for p in props if p.area < 0.5*entire_area]
+    # select one that is closest to middle
+    middle_x = image_arr.shape[0]/2
+    middle_y = image_arr.shape[1]/2
+    center = np.array([middle_x, middle_y])
+    centroids =[np.array(p.centroid) for p in filtered]
+    dists = [np.linalg.norm(c-center) for c in centroids]
+    index_for_injection_site = np.where(dists == np.amin(dists))[0][0]
+    return filtered[index_for_injection_site]
+
+image_arr =open_image(matt_test_image)
+injection_site = get_injection_site_props(image_arr)
+
+class IntensityResults(object):
+    def __init__(self):
+        self.sums = []
+        self.region_intensities = []
+        self.areas = []
+
+    def average_intensity_per_region(self):
+        return [int(i)/int(a) for i,a in zip(self.region_intensities, self.areas)]
+
+
+def compare_intensities(image_arr, injection_site):
+    injection_site_coords = injection_site.coords
+    mask = np.zeros_like(image_arr)
+    for x, y in injection_site_coords:
+        mask[x,y] = 1
+    # smallest ditance outwards
+    iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/4)
+    intensity = np.sum(image_arr)# so first intensity will actually be intensity of everything outside mask
+    res = IntensityResults()
+    area = np.sum(mask)
+    for i in range(iterations_needed):
+        masked = np.ma.masked_array(image_arr,mask)
+        # intensity in region is total intensity including region - total instensity excluding region
+        res.region_intensities.append(intensity-np.sum(masked))
+        intensity = np.sum(masked)
+        res.sums.append(intensity)
+        mask = binary_dilation(mask, iterations=4)
+        print("i: ", i, " ", np.sum(mask), " sum outside mask: ", res.sums[-1], " region intensity: ", res.region_intensities[-1])
+        res.areas.append(np.sum(mask)-area)
+        area = np.sum(mask)
+    return res.average_intensity_per_region()
+
+# need to take into account area of region
+intensities = compare_intensities(image_arr, injection_site)
+# seems to work.... first value is lower, which is probably due to mask being slightly small
+# rest show expected trend
 
 
