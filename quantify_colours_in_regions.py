@@ -125,16 +125,18 @@ for i in range(1, iterations_needed):
 # stack is 18, so take 9
 
 def open_image(filename):
-    img = Image.open(matt_test_image).convert('L')
+    img = Image.open(filename).convert('L')
     img.load()
     return np.array(img)
 
-def get_injection_site_props(image_arr):
+def get_injection_site_props(image_arr, thresh=500):
     markers = np.zeros_like(image_arr)
     markers[image_arr < 80] = 1
     labels = measure.label(markers)
     labels_filtered = skimage.morphology.remove_small_objects(labels, 500)
     labels_final = measure.label(skimage.morphology.remove_small_holes(labels_filtered, 5000))
+    plt.imshow(labels_final)
+    plt.show()
     props = measure.regionprops(labels_final, image_arr)
     # exclude label for entirey of image
     entire_area = image_arr.shape[0]*image_arr.shape[1]
@@ -166,6 +168,8 @@ def compare_intensities(image_arr, injection_site):
     mask = np.zeros_like(image_arr)
     for x, y in injection_site_coords:
         mask[x,y] = 1
+    plt.imshow(mask)
+    plt.show()
     # smallest ditance outwards
     iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/4)
     intensity = np.sum(image_arr)# so first intensity will actually be intensity of everything outside mask
@@ -189,7 +193,13 @@ intensities = compare_intensities(image_arr, injection_site)
 # rest show expected trend
 
 
-image_arr =open_image("matt_neun_smaller.png")
+image_arr =open_image("matt/matt_neun_smaller.png")
 injection_site = get_injection_site_props(image_arr)
 intensities = compare_intensities(image_arr, injection_site)
 
+image_arr =open_image("matt/matt_gfap_smaller.png")
+injection_site = get_injection_site_props(image_arr)
+intensities = compare_intensities(image_arr, injection_site)
+# test on fullsize image to get threshold
+
+injection_site = get_injection_site_props(image_arr, 100000)
