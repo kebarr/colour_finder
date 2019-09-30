@@ -46,6 +46,30 @@ plt.show()
 # to remove small contours, just remove short list.
 # two sets should give overlapping contours
 
+# for contours against dark background:
+# need to exclude all contours within biggest contour
+# actually ditto for contours with lighter background
+
+def biggest_contour_metrics(list_of_contours):
+    max_contour = max(list_of_contours, key=len)
+    xs = [i[0] for i in max_contour]
+    ys = [i[1] for i in max_contour]
+    max_x = np.max(xs)
+    min_x = np.min(xs)
+    max_y = np.max(ys)
+    min_y = np.min(ys)
+    return max_x, min_x, max_y, min_y
+
+# then determine if a contour is inside
+
+# todo: do thresholding inside list comprehension then np.any
+def is_inside_biggest_contour(contour, max_x, min_x, max_y, min_y):
+    xs = [i[0] for i in contour if i[0] >= min_x and i[0] <= max_x]
+    ys = [i[1] for i in contour if i[1] >= min_y and i[1] <= max_y]
+    for x, y in in zip(xs, ys):
+        if (x >= min_x and x <= max_x) and (y >= min_y and y <= max_y):
+            return True
+    return False
 
 binary = np.array([[image_arr[i,j] > 200 for i in range(image_arr.shape[0])] for j in range(image_arr.shape[1])])
 
@@ -54,6 +78,7 @@ binary = np.array([[image_arr[i,j] > 200 for i in range(image_arr.shape[0])] for
 
 # average radius seems to be about 2.5 pixels
 edges = feature.canny(image_arr, sigma=0.05, low_threshold=155, high_threshold=160)
+
 
 # don't think they are circular enough for hough transform, but lets try
 # if not, remove small flecks and label
