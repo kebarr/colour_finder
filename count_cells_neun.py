@@ -101,6 +101,16 @@ for c in contours_dark_background:
         if not largest_path_dark.contains_path(path):
             contours.append(c)
 
+contours_light_background = measure.find_contours(image_arr, 230)
+light_path = Path([(i[0], i[1]) for i in contours_light_background[0]])
+# then can do contains path....
+largest_path_light = Path([(i[0],i[1]) for i in max(contours_light_background, key=len)])
+for c in contours_light_background:
+    if len(c) > 10 and len(c) < 80:
+        path = Path([(i[0], i[1]) for i in c])
+        if not largest_path_light.contains_path(path):
+            contours.append(c)
+
 
 fig, ax = plt.subplots()
 ax.imshow(image_arr, cmap=plt.cm.gray)
@@ -113,43 +123,3 @@ ax.set_xticks([])
 ax.set_yticks([])
 plt.show()
 # misses some obvious ones but hopefully should work
-
-binary = np.array([[image_arr[i,j] > 200 for i in range(image_arr.shape[0])] for j in range(image_arr.shape[1])])
-
-# not going to be able to use binary image for identifying overlapping bits
-# may be better to use full rgb version? or are they always equal in which case its just more computation
-
-# average radius seems to be about 2.5 pixels
-edges = feature.canny(image_arr, sigma=0.05, low_threshold=155, high_threshold=160)
-
-
-# don't think they are circular enough for hough transform, but lets try
-# if not, remove small flecks and label
-
-hough_radii = np.array([1.5, 3])
-hough_res = hough_circle(edges, hough_radii)
-
-centers = []
-accums = []
-radii = []
-
-for radius, h in zip(hough_radii, hough_res):
-    # For each radius, extract two circles
-    peaks = peak_local_max(h, num_peaks=2)
-    centers.extend(peaks - hough_radii.max())
-    accums.extend(h[peaks[:, 0], peaks[:, 1]])
-    radii.extend([radius, radius])
-
-# Draw the most prominent 5 circles
-image = color.gray2rgb(image_arr)
-for idx in np.argsort(accums)[::-1]:
-    center_x, center_y = centers[idx]
-    radius = radii[idx]
-    cx, cy = circle_perimeter(int(center_y), int(center_x), int(radius))
-    image[cy, cx] = (220, 20, 20)
-
-plt.imshow(image, cmap=plt.cm.gray)
-plt.show()
-# ha! one of the only circles it found was not a cell
-
-# try contour finding instead of edge detection
