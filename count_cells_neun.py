@@ -309,7 +309,7 @@ def hysteresis_thresholding(im, v_low, v_high):
     labels_low = measure.label(mask_low, background=0) + 1
     count = labels_low.max()
     # Check if connected components contain pixels from mask_high
-    sums = ndimage.sum(mask_high, labels_low, np.arange(count + 1))
+    sums = scipy.ndimage.sum(mask_high, labels_low, np.arange(count + 1))
     good_label = np.zeros((count + 1,), bool)
     good_label[1:] = sums[1:] > 0
     output_mask = good_label[labels_low]
@@ -323,7 +323,7 @@ def color_segmentation(regions, n_neighbors=25):
     visualization easier.
     """
     count = regions.max()
-    centers = ndimage.center_of_mass(regions + 2, regions, 
+    centers = scipy.ndimage.center_of_mass(regions + 2, regions, 
                                      index=np.arange(1, count + 1))
     centers = np.array(centers)
     mat = kneighbors_graph(np.array(centers), n_neighbors)
@@ -341,7 +341,7 @@ def plot_colors(val_low, val_high):
     regions = measure.label(np.logical_not(seg),
                             background=0, connectivity=1)
     color_regions = color_segmentation(regions)
-    colors = [plt.cm.spectral(val) for val in 
+    colors = [plt.cm.viridis(val) for val in 
                    np.linspace(0, 1, color_regions.max() + 1)]
     image_label_overlay = color.label2rgb(color_regions, 
                                           im_denoised[::2, ::2],
@@ -353,6 +353,21 @@ def plot_colors(val_low, val_high):
     plt.imshow(im_denoised, cmap='gray')
     return regions
 
+regions = plot_colors(0.3 * n_real, 0.55 * n_real)
+# so this gets the regions outside the dots!!
+
+regions_clean = morphology.remove_small_objects(regions + 1, min_size=60)
+regions_clean, _, _ = segmentation.relabel_sequential(regions_clean)
+plt.imshow(np.random.permutation(regions_clean.max() + 1)[regions_clean],
+                   cmap='gist_rainbow')
+
+# should be with regions clean, but not working
+final_segmentation = segmentation.random_walker(im_denoised[::2, ::2][:278, :278], 
+                                                regions,
+                                                beta=25000, mode='cg_mg')
 
 
+plt.imshow(color.label2rgb(final_segmentation, im_denoised[::2, ::2],
+                    colors=plt.cm.gist_rainbow(np.linspace(0, 1, 40))))
+ax = plt.axis('off')
 
