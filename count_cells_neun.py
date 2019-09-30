@@ -63,13 +63,56 @@ def biggest_contour_metrics(list_of_contours):
 # then determine if a contour is inside
 
 # todo: do thresholding inside list comprehension then np.any
-def is_inside_biggest_contour(contour, max_x, min_x, max_y, min_y):
+# doesn't work cos it takes everything inside bounding box
+def is_inside_contour(contour, max_x, min_x, max_y, min_y):
     xs = [i[0] for i in contour if i[0] >= min_x and i[0] <= max_x]
     ys = [i[1] for i in contour if i[1] >= min_y and i[1] <= max_y]
-    for x, y in in zip(xs, ys):
+    for x, y in  zip(xs, ys):
         if (x >= min_x and x <= max_x) and (y >= min_y and y <= max_y):
             return True
     return False
+
+contours_dark_background = measure.find_contours(image_arr, 160)
+contours_light_background = measure.find_contours(image_arr, 230)
+dark_max_x, dark_min_x, dark_max_y, dark_min_y = biggest_contour_metrics(contours_dark_background)
+contours_dark_filtered = [c for c in contours_dark_background if not (is_inside_contour(c, dark_max_x, dark_min_x, dark_max_y, dark_min_y))]
+
+light_max_x, light_min_x, light_max_y, light_min_y = biggest_contour_metrics(contours_light_background)
+contours_light_filtered = [c for c in contours_dark_background if not (is_inside_contour(c, light_max_x, light_min_x, light_max_y, light_min_y))]
+fig, ax = plt.subplots()
+ax.imshow(image_arr, cmap=plt.cm.gray)
+
+for n, contour in enumerate(contours_light_background):
+    ax.plot(contour[:, 1], contour[:, 0], linewidth=2)
+
+ax.axis('image')
+ax.set_xticks([])
+ax.set_yticks([])
+plt.show()
+
+contours_dark_background = measure.find_contours(image_arr, 180)
+dark_path = Path([(i[0], i[1]) for i in contours_dark_background[0]])
+# then can do contains path....
+largest_path_dark = Path([(i[0],i[1]) for i in max(contours_dark_background, key=len)])
+contours = []
+for c in contours_dark_background:
+    if len(c) > 10 and len(c) < 80:
+        path = Path([(i[0], i[1]) for i in c])
+        if not largest_path_dark.contains_path(path):
+            contours.append(c)
+
+
+fig, ax = plt.subplots()
+ax.imshow(image_arr, cmap=plt.cm.gray)
+
+for n, contour in enumerate(contours):
+    ax.plot(contour[:, 1], contour[:, 0], linewidth=2)
+
+ax.axis('image')
+ax.set_xticks([])
+ax.set_yticks([])
+plt.show()
+# misses some obvious ones but hopefully should work
 
 binary = np.array([[image_arr[i,j] > 200 for i in range(image_arr.shape[0])] for j in range(image_arr.shape[1])])
 
