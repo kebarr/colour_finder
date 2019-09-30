@@ -20,6 +20,33 @@ img = Image.open("matt/matt_neun_smaller.png").convert("L")
 img.load()
 image_arr = np.array(img)
 
+
+contours_dark_background = measure.find_contours(image_arr, 160)
+contours_light_background = measure.find_contours(image_arr, 230)
+contours = []
+# actually probably don't need this, can do in oter loop
+for c in contours_dark_background + contours_light_background:
+    if len(c) > 15 and len(c) < 100:
+        contours.append(c)
+
+fig, ax = plt.subplots()
+ax.imshow(image_arr, cmap=plt.cm.gray)
+
+for n, contour in enumerate(contours):
+    ax.plot(contour[:, 1], contour[:, 0], linewidth=2)
+
+ax.axis('image')
+ax.set_xticks([])
+ax.set_yticks([])
+plt.show()
+
+# contours is a list of pairs of coordinates
+# think we need to use two thresholds- one for cells close to middle (220)
+# and one for cells further out
+# to remove small contours, just remove short list.
+# two sets should give overlapping contours
+
+
 binary = np.array([[image_arr[i,j] > 200 for i in range(image_arr.shape[0])] for j in range(image_arr.shape[1])])
 
 # not going to be able to use binary image for identifying overlapping bits
