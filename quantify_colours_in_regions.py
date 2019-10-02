@@ -129,12 +129,12 @@ def open_image(filename):
     img.load()
     return np.array(img)
 
-def get_injection_site_props(image_arr, thresh=500):
+def get_injection_site_props(image_arr, pixel_thresh=80, thresh_object=500, thresh_hole=5000):
     markers = np.zeros_like(image_arr)
-    markers[image_arr < 80] = 1
+    markers[image_arr < pixel_thresh] = 1
     labels = measure.label(markers)
-    labels_filtered = skimage.morphology.remove_small_objects(labels, 500)
-    labels_final = measure.label(skimage.morphology.remove_small_holes(labels_filtered, 5000))
+    labels_filtered = skimage.morphology.remove_small_objects(labels, thresh_object)
+    labels_final = measure.label(skimage.morphology.remove_small_holes(labels_filtered, thresh_hole))
     plt.imshow(labels_final)
     plt.show()
     props = measure.regionprops(labels_final, image_arr)
@@ -163,15 +163,16 @@ class IntensityResults(object):
         return [int(i)/int(a) for i,a in zip(self.region_intensities, self.areas)]
 
 
-def compare_intensities(image_arr, injection_site):
+def compare_intensities(image_arr, injection_site, out_filename):
     injection_site_coords = injection_site.coords
     mask = np.zeros_like(image_arr)
     for x, y in injection_site_coords:
         mask[x,y] = 1
     plt.imshow(mask)
-    plt.show()
+    plt.savefig(out_filename)
     # smallest ditance outwards
     iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/4)
+    print(iterations_needed)
     intensity = np.sum(image_arr)# so first intensity will actually be intensity of everything outside mask
     res = IntensityResults()
     area = np.sum(mask)
@@ -182,10 +183,10 @@ def compare_intensities(image_arr, injection_site):
         intensity = np.sum(masked)
         res.sums.append(intensity)
         mask = binary_dilation(mask, iterations=4)
-        print("i: ", i, " ", np.sum(mask), " sum outside mask: ", res.sums[-1], " region intensity: ", res.region_intensities[-1])
+        #print("i: ", i, " ", np.sum(mask), " sum outside mask: ", res.sums[-1], " region intensity: ", res.region_intensities[-1])
         res.areas.append(np.sum(mask)-area)
         area = np.sum(mask)
-    return res.average_intensity_per_region()
+    return res
 
 # need to take into account area of region
 intensities = compare_intensities(image_arr, injection_site)
@@ -201,5 +202,13 @@ image_arr =open_image("matt/matt_gfap_smaller.png")
 injection_site = get_injection_site_props(image_arr)
 intensities = compare_intensities(image_arr, injection_site)
 # test on fullsize image to get threshold
+image_arr =open_image("matt/MAX_Iba1.tif")
+injection_site = get_injection_site_props(image_arr, 70, 100000, 100000)
+intensities = compare_intensities(image_arr, injection_site,"matt/MAX_Iba1_max.png")
 
-injection_site = get_injection_site_props(image_arr, 100000)
+final = intensities.average_intensity_per_region()
+results = "matt/max_iba1_results.csv"
+
+with open(results, "w+") as f:
+    for line in final:
+        f.write(str(line)+", ")

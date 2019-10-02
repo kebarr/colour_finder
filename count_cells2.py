@@ -11,7 +11,7 @@ from skimage import measure
 from scipy.ndimage import median_filter
 from skimage.color import label2rgb
 import os
-
+import skimage
 
 def count_yellow(filename):
     img = Image.open(filename)
@@ -150,19 +150,19 @@ def count_blue(filename):
     image_arr = np.array(img)
     #plt.imshow(image_arr)
     #plt.show()
-    filter_match = lambda x: ((x[0]<30) & (x[1]< 40) & (80 < x[2]<255) | (x[0]<4) & (x[1]< 4) & (30 < x[2]<255) )
+    filter_match = lambda x: ((x[0]<30) & (x[1]< 40) & (80 < x[2]<255) | (x[0]<5) & (x[1]< 5) & (30 < x[2]<255) )
     match_arr = np.zeros((image_arr.shape[0], image_arr.shape[1]))
     for i in range(len(image_arr)):
             for j in range(len(image_arr[i])):
                     if filter_match(image_arr[i][j]):
                         image_arr[i][j] = np.array([250, 250, 0], dtype=np.uint8)
                         match_arr[i, j] = 1
-    #plt.imshow(image_arr)
-    #plt.show()
+    plt.imshow(image_arr)
+    plt.show()
     lbl = measure.label(match_arr)
     return lbl
 
-def count_cells(props):
+def count_cells_simple(props):
     euler_numbers = [p.euler_number for p in props[1:]]
     # euler number of 1= no holes, 
     total_cells = 0
@@ -183,18 +183,22 @@ def count_green_inc_dapi(filename_green, filename_blue):
     plt.savefig(filename_blue.split("jpg")[0] + '_found.png')
     green_arr = get_gs_array(filename_green)
     labels = get_labelled_image_green(green_arr, 30, 45)
-    plt.imshow(labels)
-    plt.show()
+    #plt.imshow(labels)
+    #plt.show()
     props = measure.regionprops(labels, green_arr)
-    props_small_regions = [p for p in props if p.major_axis_length < 6]
+    props_small_regions = [p for p in props if p.major_axis_length < 6 and p.major_axis_length>2.5]
     props_big_regions = [p for p in props if p.major_axis_length >= 6]
     print("small: ", len(props_small_regions))
     print("big: ", len(props_big_regions))
+    for p in props_big_regions[1:]:
+        green_arr[p.slice[0], p.slice[1]] = 255
+    #plt.imshow(green_arr)
+    #plt.show()
     overlapping_dapi= set()
     for prop in props_small_regions:
         res = overlaps_dapi_region(prop, lbl_blue)
         overlapping_dapi = overlapping_dapi.union(res)
-    number_large_cells = count_cells(props_big_regions)
+    number_large_cells = count_cells_simple(props_big_regions)
     print("%d large cells found" % number_large_cells)
     print("found %d green cells in %s"% (len(overlapping_dapi)+number_large_cells, filename_green))
 
@@ -217,6 +221,13 @@ img = Image.open(td)
 img.load()
 image_arr = np.array(img)
 count_green_inc_dapi(ti, td)
+
+td2 = "../maria/count_cell_images/dapi_staining/" +dapi_images[2]
+ti2 = "../maria/count_cell_images/" + iba_images[2]
+img = Image.open(td2)
+img.load()
+image_arr = np.array(img)
+count_green_inc_dapi(ti2, td2)
 ### best results so far:(green_arr, 30, 45) and major axis length 6
 # found 523 green cells in ../maria/count_cell_images/IBA1-1.2.jpg
 # found 341 green cells in ../maria/count_cell_images/IBA1-1.3.jpg
@@ -226,3 +237,109 @@ count_green_inc_dapi(ti, td)
 # found 400 green cells in ../maria/count_cell_images/IBA1-3.1.jpg
 # found 310 green cells in ../maria/count_cell_images/IBA1-3.2.jpg
 # found 344 green cells in ../maria/count_cell_images/IBA1-3.3.jpg
+
+
+
+
+def count_yellow(filename):
+    img = Image.open(filename)
+    img.load()
+    image_arr = np.array(img)
+    filter_match = lambda x: ((150<x[0]) & (115 < x[1]) & (x[2]<60)) # | (100<x[0]) & (50 < x[1]) & (x[2]<20))
+    match_arr = np.zeros((image_arr.shape[0], image_arr.shape[1]))
+    for i in range(len(image_arr)):
+            for j in range(len(image_arr[i])):
+                    if filter_match(image_arr[i][j]):
+                        image_arr[i][j] = np.array([40, 0, 250], dtype=np.uint8)
+                        match_arr[i, j] = 1
+    #plt.imshow(image_arr)
+    #plt.show()
+    outfile = filename.split('.jpg')[0] + '_yellow.png'
+    #filtered = median_filter(match_arr, size=3) # orignally done with size = 3
+    res = count_cells(match_arr, image_arr, outfile, True, 8)
+    return res
+
+
+def count_cells(to_count, original_array, outfile, filter=False, thresh=10):
+    labels = measure.label(to_count)
+    if filter:
+        labels = skimage.morphology.remove_small_objects(labels, thresh)
+    plt.imshow(labels)
+    plt.savefig(outfile)
+    props = measure.regionprops(labels, to_count)
+    euler_numbers = [p.euler_number for p in props[1:]]
+    # euler number of 1= no holes, 
+    total_cells = 0
+    for e in euler_numbers:
+        if e == 0 or e == 1:
+            total_cells += 1
+        else:
+            # euler number is 1 - number of holes, so number of cells is -euler_number + 1
+            total_cells += abs(e) + 1
+    return total_cells
+
+# redo yellow counting with different background:
+maria_images = os.listdir("../maria/count_cell_images")
+merge_images = sorted([im for im in maria_images if im.startswith('Merge') and im.endswith('-1.jpg')])
+for i in range(len(merge_images)):
+    filename_yellow = '../maria/count_cell_images/' + merge_images[i]
+    #print(filename_yellow)
+    cells_yellow = count_yellow(filename_yellow)
+    print("%d yellow cells in %s" % (cells_yellow, merge_images[i]))
+
+
+# yellowfilter not detecting enough of 2.3-1
+m23 = '../maria/count_cell_images/' + merge_images[2]
+img = Image.open(m23)
+img.load()
+image_arr = np.array(img)
+plt.imshow(image_arr)
+plt.show()
+
+
+#found 505 green cells in ../maria/count_cell_images/IBA1-1.2.jpg
+#found 325 green cells in ../maria/count_cell_images/IBA1-1.3.jpg
+#found 442 green cells in ../maria/count_cell_images/IBA1-2.1.jpg
+#found 514 green cells in ../maria/count_cell_images/IBA1-2.2.jpg
+#found 451 green cells in ../maria/count_cell_images/IBA1-2.3.jpg
+#found 394 green cells in ../maria/count_cell_images/IBA1-3.1.jpg
+#found 298 green cells in ../maria/count_cell_images/IBA1-3.2.jpg
+#found 323 green cells in ../maria/count_cell_images/IBA1-3.3.jpg
+
+#219 yellow cells in Merge-1.2-1.jpg - makes 43%
+#167 yellow cells in Merge-1.3-1.jpg - 51%
+#50 yellow cells in Merge-2.3-1.jpg - 11%
+#197 yellow cells in Merge-3.1-1.jpg - 50%
+#100 yellow cells in Merge-3.2-1.jpg - 33%
+#136 yellow cells in Merge-3.3-1.jpg -42%
+
+
+# iba to count:
+iba1 = "maria/count_cells2/IBA1-1.1.jpeg"
+iba2 = "maria/count_cells2/IBA1-2.4.jpeg"
+
+# corresponding dapi:
+dapi1 = "maria/count_cell_images/dapi_staining/iba1dapi1.1.jpg"
+dapi2 = "maria/count_cell_images/dapi_staining/iba1dapi2.4.jpg"
+count_green_inc_dapi(iba1, dapi1)
+count_green_inc_dapi(iba2, dapi2)
+# yellow to count:
+
+merge1 = "maria/count_cells2/Merge-1.1.jpg"
+merge2 = "maria/count_cells2/Merge-2.1.jpg"
+merge3 = "maria/count_cells2/Merge-2.2.jpg"
+merge4 = "maria/count_cells2/Merge-2.4.jpg"
+merges = [merge1, merge2, merge3, merge4]
+
+for m in merges:
+    cells_yellow = count_yellow(m)
+    print("%d yellow cells in %s" % (cells_yellow, m))
+  
+
+#165 yellow cells in maria/count_cells2/Merge-1.1.jpg - 264 green, 62%
+#71 yellow cells in maria/count_cells2/Merge-2.1.jpg - 442 green, 16%
+#50 yellow cells in maria/count_cells2/Merge-2.2.jpg - 514 green, 10%
+#45 yellow cells in maria/count_cells2/Merge-2.4.jpg - 449 green, 10%
+
+#found 264 green cells in maria/count_cells2/IBA1-1.1.jpeg
+# found 449 green cells in maria/count_cells2/IBA1-2.4.jpeg
