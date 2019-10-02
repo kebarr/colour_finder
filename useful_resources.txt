@@ -1,2 +1,6 @@
+colour separation in biological images:
+https://scikit-image.org/docs/stable/auto_examples/color_exposure/plot_ihc_color_separation.html#sphx-glr-auto-examples-color-exposure-plot-ihc-color-separation-py
+
+https://books.google.co.uk/books?hl=en&lr=&id=SsmbDwAAQBAJ&oi=fnd&pg=PT8&dq=advanced+biomedical+image+analysis+tutorial&ots=TA5t2m9pNd&sig=oIxM2TxnNCXBH4FU4QeJuugBOa0#v=onepage&q=advanced%20biomedical%20image%20analysis%20tutorial&f=false
 https://www.hackevolve.com/counting-bricks/
 http://emmanuelle.github.io/a-tutorial-on-segmentation.html

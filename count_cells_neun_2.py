@@ -10,7 +10,7 @@ from skimage.color import label2rgb
 import os
 from skimage import morphology
 from skimage import exposure
-
+from skimage import feature
 
 img = Image.open("matt/matt_neun_smaller.png").convert("L")
 img.load()
@@ -39,6 +39,12 @@ labels = measure.label(binary)
 plt.imshow(labels)
 plt.show()
 
+props = measure.regionprops(labels, image_arr)
+show_cells_counted = np.zeros_like(image_arr)
+for prop in props_low_contrast_filtered:
+        for coord in prop.coords:
+            show_cells_counted[coord[0], coord[1]] = 20
+
 # might need to combine higher and lower contrast image.....
 # then use similar approach to with marias dapi image
 # lower contrast will have more amalgamated blobs, need to separate them based on high contrast image
@@ -47,8 +53,6 @@ def get_labelled_array(image_arr, gamma, binary_threshold):
     gamma_corrected = exposure.adjust_gamma(image_arr, gamma)
     binary = np.zeros_like(gamma_corrected)
     binary = gamma_corrected > binary_threshold
-    plt.imshow(binary)
-    plt.show()
     labels = measure.label(binary)
     return labels
 
@@ -66,13 +70,18 @@ def count_cells_neun(filename):
     img.load()
     image_arr = np.array(img)
     labels_low_contrast = get_labelled_array(image_arr, 8, 50)
+    plt.imshow(labels_low_contrast)
+    plt.show()
     labels_high_contrast = get_labelled_array(image_arr, 100, 200)
     props_low_contrast = measure.regionprops(labels, image_arr) 
     props_high_contrast = measure.regionprops(labels, image_arr)
+    print(len(props_low_contrast))
     # large low contrast labels are likely to be multiple cells 
-    props_low_contrast_large = [p for p in props_low_contrast if p.major_axis_length>10]
-    props_low_contrast_filtered = [p for p in props_low_contrast if p.major_axis_length<=10 and p.major_axis_length >2]
-    print("low contrast filtered: ", len(props_high_contrast_filtered))
+    props_low_contrast_large = [p for p in props_low_contrast if len(p.coords)>25 and len(p.coords) < 100]
+    props_low_contrast_filtered = [p for p in props_low_contrast if len(p.coords)<=25 and len(p.coords) >1]
+    props_high_contrast_filtered = [p for p in props_high_contrast if len(p.coords)<100 and len(p.coords) >1]
+    print("low contrast filtered: ", len(props_low_contrast_filtered))
+    print("high contrast filtered: ", len(props_high_contrast_filtered))
     print("low contrast large: ", len(props_low_contrast_large))
     overlapping= set()
     # for each low contrast region, find the high contrast labels that it contains
@@ -80,11 +89,147 @@ def count_cells_neun(filename):
     for prop in props_low_contrast_large:
         res = overlaps_region(prop, labels_high_contrast)
         overlapping = overlapping.union(res)
+    show_cells_counted = np.zeros_like(image_arr)
+    for label in overlapping:
+        for coord in props_high_contrast[label].coords:
+            show_cells_counted[coord[0], coord[1]] = 3
+    for prop in props_low_contrast_filtered:
+        for coord in prop.coords:
+            show_cells_counted[coord[0], coord[1]] = 1
+    for prop in props_low_contrast_large:
+        for coord in prop.coords:
+            show_cells_counted[coord[0], coord[1]] = 2
+    plt.imshow(show_cells_counted)
+    plt.show()
+    plt.imshow(show_cells_counted)
+    plt.savefig("cells_counted.png")
     number_cells = count_cells_simple(props_low_contrast)
-    print("%d cells found using naive method" % number_large_cells)
+    print("%d cells found using naive method" % number_cells)
     print("found %d cells found in total %s"% (len(overlapping)+number_cells, filename))
 
 
-
+count_cells_neun("matt/matt_neun_smaller.png")
 # looks potentially useful... https://clickpoints.readthedocs.io/en/latest/examples/example_plantroot.html
-#https://www.hackevolve.com/counting-bricks/
+#https://www.hackevolve.com/counting-bricks/\
+
+
+# try this....
+http://scipy-lectures.org/advanced/image_processing/auto_examples/plot_spectral_clustering.html#sphx-glr-advanced-image-processing-auto-examples-plot-spectral-clustering-py
+from sklearn.feature_extraction import image
+from sklearn.cluster import spectral_clustering
+
+labels = spectral_clustering(image_arr)
+mask = image_arr.astype(bool)
+image_arr = image_arr.astype(float)
+image_arr += 1 + 0.2 * np.random.randn(*image_arr.shape)
+
+graph = image.img_to_graph(image_arr, mask=mask)
+
+graph.data = np.exp(-graph.data / graph.data.std())
+# this line is incredibly slow- prohibitively slow.....
+labels = spectral_clustering(graph, eigen_solver='arpack')
+label_im = np.full(mask.shape, -1.)
+label_im[mask] = labels
+
+plt.matshow(img)
+plt.matshow(label_im)
+
+# maybe try splitting image and doing it on smaller versions
+# 111 by 111 would give 5
+size = 111
+image_tiles = []
+for i in range(5):
+    for j in range(5):
+        tile = image_arr[i*111:i*111+111, j*111:j*111+111]
+        image_tiles.append(tile)
+
+tile1 = image_tiles[0]
+mask = tile1.astype(bool)
+graph = image.img_to_graph(tile1, mask=mask)
+
+graph.data = np.exp(-graph.data / graph.data.std())
+# this line is incredibly slow- prohibitively slow.....
+labels = spectral_clustering(graph, n_clusters = 200, eigen_solver='arpack')
+label_im = np.full(mask.shape, -1.)
+label_im[mask] = labels
+
+plt.matshow(img)
+plt.matshow(label_im)
+
+# ha no where near, still not when i increase number of clusters
+
+# try https://scikit-image.org/docs/stable/auto_examples/edges/plot_ridge_filter.html#sphx-glr-auto-examples-edges-plot-ridge-filter-py
+from skimage.filters import meijering, sato, frangi, hessian
+
+
+# hopeful.....
+plt.imshow(hessian(image_arr, black_ridges=True))
+plt.axis('off')
+plt.show() 
+
+# nope:
+plt.imshow(meijering(image_arr, black_ridges=False))
+plt.axis('off')
+plt.show() 
+
+# possible
+plt.imshow(sato(image_arr, black_ridges=True))
+plt.axis('off')
+plt.show() 
+
+# also possible
+plt.imshow(frangi(image_arr, black_ridges=True))
+plt.axis('off')
+plt.show() 
+
+# try segmentation with frangi and sato and compare results
+frangi_im = frangi(image_arr, black_ridges=True)
+sato_im = sato(image_arr, black_ridges=True)
+edges_frangi = feature.canny(frangi_im, sigma=0.2, low_threshold=0.07, \
+                      high_threshold=0.18)
+plt.imshow(edges_frangi, cmap='gray')
+
+edges_sato = feature.canny(sato_im, sigma=0.2, low_threshold=0.07, \
+                      high_threshold=0.18)
+plt.imshow(edges_sato, cmap='gray')
+
+# edge detection probably isn't the right approach....
+
+# increase contrast then label....
+gamma_corrected_sato = exposure.adjust_gamma(sato_im, 1)
+gamma_corrected_frangi = exposure.adjust_gamma(frangi_im, 8)
+
+frangi_im = frangi(image_arr, black_ridges=True)
+sato_im = sato(image_arr, black_ridges=True)
+# need to mask out center before contrast adjustment. 
+for i in range(240,325):
+    for j in range(214, 295):
+        sato_im[j, i] = 0
+
+# takes out too much outside of center
+sato_im[sato_im >20] = 0
+
+gamma_corrected_sato = exposure.adjust_gamma(sato_im, 1)
+plt.imshow(gamma_corrected_sato)
+plt.show()
+
+# then try labelling
+gamma_corrected_sato = exposure.adjust_gamma(sato_im, 1)
+labels = measure.label(gamma_corrected_sato)
+plt.imshow(labels)
+plt.show()
+# it labels background and leaves bits we want as foreground
+gamma_corrected_sato[np.where(gamma_corrected_sato==0)] = 60
+plt.imshow(gamma_corrected_sato)
+plt.show()
+
+# actually try logarithmic correction
+
+logarithmic_corrected_sato = exposure.adjust_log(sato_im, 10)
+logarithmic_corrected_frangi = exposure.adjust_log(frangi_im, 10)
+
+# log correct makes the contrast higher
+
+
+
+
