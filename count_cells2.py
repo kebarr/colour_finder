@@ -385,28 +385,24 @@ def HSVColor(img):
 from matplotlib.colors import hsv_to_rgb
 
 def HSVColor(img_arr):
-        h = img_arr[:,:,0].flatten()
-        s = img_arr[:,:,1].flatten()
-        v = img_arr[:,:,2].flatten()
-        Hdat = []
-        Sdat = []
-        Vdat = [] 
-        for hue,sat,val in zip(h, s, v):
-            r, g, b = hsv_to_rgb((np.int(hue/255),np.int(sat/255),np.int(val/255)))
-            print(np.int(hue/255),np.int(sat/255),np.int(val/255))
-            print(r,g,b)
-            Hdat.append(int(r))
-            Sdat.append(int(g))
-            Vdat.append(int(b))
-        r.putdata(Hdat)
-        g.putdata(Sdat)
-        b.putdata(Vdat)
-        return Image.merge('RGB',(r,g,b))
-    else:
-        return None
+        new_arr = np.zeros_like(img_arr)
+        for i in range(img_arr.shape[0]):
+            for j in range(img_arr.shape[1]):
+                hue = img_arr[i, j, 0]
+                sat = img_arr[i, j, 1]
+                val = img_arr[i, j, 2]
+                #print("h, s,v: ", hue, sat, val)
+                r, g, b = colorsys.hsv_to_rgb(np.float(hue/255),np.float(sat/255),np.float(val/255))
+                #print(r,g,b)
+                #print(r*255,g*255,b*255)
+                new_arr[i, j, 0] = int(r*255)
+                new_arr[i, j, 1] = int(g*255)
+                new_arr[i, j, 2] = int(b*255)           
+        return new_arr
 
 
-rgb = RGBColor(img_hsv)
+
+rgb = HSVColor(np.array(img_hsv))
 plt.imshow(rgb)
 plt.show()
 # dividing by rd, gn and bl (which are actually hsl) by 255 results in 
@@ -415,18 +411,25 @@ plt.show()
 
 # yellow in hsv is about 20 to about 70 (very generous, almost red on one side, green on other)
 
+img_hsv = Image.open(merge4).convert('HSV')
+image_arr_hsv = np.array(img_hsv)
+
 # yellow_channel = np.array([[[image_arr[i,j,0], image_arr[i,j,0], 0] for i in range(image_arr.shape[1])] for j in range(image_arr.shape[0])])
-yellow_channel = np.zeros_like(image_arr)
-for i in range(image_arr.shape[0]):
-    for j in range(image_arr.shape[1]):
-        if image_arr[i, j, 0] < 60 and image_arr[i, j, 0] > 40:
-            yellow_channel[i, j] = image_arr[i, j]
+yellow_channel = np.zeros_like(image_arr_hsv)
+yellow_channel_bin = np.zeros_like(image_arr_hsv)
+for i in range(image_arr_hsv.shape[0]):
+    for j in range(image_arr_hsv.shape[1]):
+        if image_arr_hsv[i, j, 0] < 59 and image_arr_hsv[i, j, 0] > 40:
+            yellow_channel[i, j] = image_arr_hsv[i, j]
+            yellow_channel_bin[i,j] = 1
         else:
             yellow_channel[i,j] = np.array([0,0,0])
 
-plt.imshow(yellow_channel)
+
+plt.imshow(HSVColor(yellow_channel))
 plt.show()
 # need to convert back to RGB....
 # image_arr[i, j, 0] < 70 and image_arr[i, j, 0] > 30 too lax... mostly red and gren
 
+# now need to create a binary array, dilate to fill some gaps round nuclei, 
 
