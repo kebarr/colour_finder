@@ -108,7 +108,7 @@ def count_cells_neun(filename):
     print("found %d cells found in total %s"% (len(overlapping)+number_cells, filename))
 
 
-count_cells_neun("matt/matt_neun_smaller.png")
+count_cells_neun("matt/matt_neun_smaller.png") # 2488
 # looks potentially useful... https://clickpoints.readthedocs.io/en/latest/examples/example_plantroot.html
 #https://www.hackevolve.com/counting-bricks/\
 
@@ -263,6 +263,10 @@ sato_thresholded[logarithmic_corrected_sato<3] = 1
 
 sato_labelled = measure.label(sato_thresholded) # gives 1119 cells
 plt.imshow(sato_labelled)
-plt.show() 
+plt.show()
+
+# 50% as many as other approach - check way i've totalled them....
+# compare output images - original approach varying contrast is better.
+
 
 

@@ -345,10 +345,88 @@ for m in merges:
 # found 449 green cells in maria/count_cells2/IBA1-2.4.jpeg
 
 # try just analysing the yellow channel
-img = Image.open(merge1)
+img_hsv = Image.open(merge4).convert('HSV')
+image_arr_hsv = np.array(img_hsv)
+plt.imshow(image_arr_hsv)
+plt.show()
+
+img = Image.open(merge4)
 img.load()
 image_arr = np.array(img)
 plt.imshow(image_arr)
 plt.show()
+
+# need to subtract blue,  as RGB for yellow is equal amounts red and green
+blue_channel_subtracted = np.array([[[image_arr[i,j,0], image_arr[i,j,1], 0] for i in range(image_arr.shape[1])] for j in range(image_arr.shape[0])])
+# don't think this works cos the image looks totally different, and some yellow just disappears
+
+# try hsl
+
+import colorsys
+
+def HSVColor(img):
+    if isinstance(img,Image.Image):
+        r,g,b = img.split()
+        Hdat = []
+        Sdat = []
+        Vdat = [] 
+        for rd,gn,bl in zip(r.getdata(),g.getdata(),b.getdata()) :
+            h,s,v = colorsys.rgb_to_hsv(rd/255.,gn/255.,bl/255.)
+            Hdat.append(int(h*255.))
+            Sdat.append(int(s*255.))
+            Vdat.append(int(v*255.))
+        r.putdata(Hdat)
+        g.putdata(Sdat)
+        b.putdata(Vdat)
+        return Image.merge('RGB',(r,g,b))
+    else:
+        return None
+
+from matplotlib.colors import hsv_to_rgb
+
+def HSVColor(img_arr):
+        h = img_arr[:,:,0].flatten()
+        s = img_arr[:,:,1].flatten()
+        v = img_arr[:,:,2].flatten()
+        Hdat = []
+        Sdat = []
+        Vdat = [] 
+        for hue,sat,val in zip(h, s, v):
+            r, g, b = hsv_to_rgb((np.int(hue/255),np.int(sat/255),np.int(val/255)))
+            print(np.int(hue/255),np.int(sat/255),np.int(val/255))
+            print(r,g,b)
+            Hdat.append(int(r))
+            Sdat.append(int(g))
+            Vdat.append(int(b))
+        r.putdata(Hdat)
+        g.putdata(Sdat)
+        b.putdata(Vdat)
+        return Image.merge('RGB',(r,g,b))
+    else:
+        return None
+
+
+rgb = RGBColor(img_hsv)
+plt.imshow(rgb)
+plt.show()
+# dividing by rd, gn and bl (which are actually hsl) by 255 results in 
+# dividing by nothing 0s the gn and bl channels
+
+
+# yellow in hsv is about 20 to about 70 (very generous, almost red on one side, green on other)
+
+# yellow_channel = np.array([[[image_arr[i,j,0], image_arr[i,j,0], 0] for i in range(image_arr.shape[1])] for j in range(image_arr.shape[0])])
+yellow_channel = np.zeros_like(image_arr)
+for i in range(image_arr.shape[0]):
+    for j in range(image_arr.shape[1]):
+        if image_arr[i, j, 0] < 60 and image_arr[i, j, 0] > 40:
+            yellow_channel[i, j] = image_arr[i, j]
+        else:
+            yellow_channel[i,j] = np.array([0,0,0])
+
+plt.imshow(yellow_channel)
+plt.show()
+# need to convert back to RGB....
+# image_arr[i, j, 0] < 70 and image_arr[i, j, 0] > 30 too lax... mostly red and gren
 
 
