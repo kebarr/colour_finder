@@ -226,10 +226,43 @@ plt.show()
 # actually try logarithmic correction
 
 logarithmic_corrected_sato = exposure.adjust_log(sato_im, 10)
-logarithmic_corrected_frangi = exposure.adjust_log(frangi_im, 10)
+logarithmic_corrected_frangi = exposure.adjust_log(frangi_im, 5)
 
 # log correct makes the contrast higher
 
+logarithmic_corrected_sato = -logarithmic_corrected_sato + 60
 
+logarithmic_corrected_frangi = exposure.adjust_log(frangi_im, 5)
+logarithmic_corrected_frangi = -logarithmic_corrected_frangi + 60
+
+# sato looks much better
+label_frangi = measure.label(logarithmic_corrected_frangi)
+label_sato = measure.label(logarithmic_corrected_sato)
+
+# straight labelling didn't work.... don't need to do - log correction if we threshold
+
+
+def get_segmented_image(array, marker_lower, marker_upper):
+    markers = np.zeros_like(array)
+    markers[array < marker_lower] = 2
+    markers[array > marker_upper] = 1
+    plt.imshow(markers)
+    plt.show()
+    elevation_map = sobel(array)
+    ws = watershed(elevation_map, markers)
+    return ws
+
+logarithmic_corrected_sato = exposure.adjust_log(sato_im, 7)
+sato_segmented = get_segmented_image(sato_im, 4, 20)
+
+# threshold 20 to above works really well, but still misses some, (log threshold 10)
+
+# think we can just binarise
+sato_thresholded = np.zeros_like(sato_im)
+sato_thresholded[logarithmic_corrected_sato<3] = 1
+
+sato_labelled = measure.label(sato_thresholded) # gives 1119 cells
+plt.imshow(sato_labelled)
+plt.show() 
 
 

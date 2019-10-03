@@ -343,3 +343,12 @@ for m in merges:
 
 #found 264 green cells in maria/count_cells2/IBA1-1.1.jpeg
 # found 449 green cells in maria/count_cells2/IBA1-2.4.jpeg
+
+# try just analysing the yellow channel
+img = Image.open(merge1)
+img.load()
+image_arr = np.array(img)
+plt.imshow(image_arr)
+plt.show()
+
+
