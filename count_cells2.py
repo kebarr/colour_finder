@@ -416,7 +416,7 @@ image_arr_hsv = np.array(img_hsv)
 
 # yellow_channel = np.array([[[image_arr[i,j,0], image_arr[i,j,0], 0] for i in range(image_arr.shape[1])] for j in range(image_arr.shape[0])])
 yellow_channel = np.zeros_like(image_arr_hsv)
-yellow_channel_bin = np.zeros_like(image_arr_hsv)
+yellow_channel_bin = np.array([[0 for i in range(image_arr_hsv.shape[0])]for j in range(image_arr_hsv.shape[1])])
 for i in range(image_arr_hsv.shape[0]):
     for j in range(image_arr_hsv.shape[1]):
         if image_arr_hsv[i, j, 0] < 59 and image_arr_hsv[i, j, 0] > 40:
@@ -432,4 +432,25 @@ plt.show()
 # image_arr[i, j, 0] < 70 and image_arr[i, j, 0] > 30 too lax... mostly red and gren
 
 # now need to create a binary array, dilate to fill some gaps round nuclei, 
+fig, axs = plt.subplots(1,2)
+axs[0].imshow(yellow_channel_bin)
+dilated = binary_dilation(yellow_channel_bin)
+axs[1].imshow(dilated)
+plt.show()
+from skimage.morphology import remove_small_objects
+
+
+
+# label first, remove small elements, then dilate
+labelled = measure.label(yellow_channel_bin)
+binary_denoised = remove_small_objects(labelled, 4)
+dilated = binary_dilation(binary_denoised)
+plt.imshow(dilated)
+plt.show()
+
+# use dilated..... then use the dapi staining again to count cells,
+
+# corresponding dapi:
+dapi24 = 'count_cell_images/dapi_standing/iba1dapi2.4.jpg'
+
 
