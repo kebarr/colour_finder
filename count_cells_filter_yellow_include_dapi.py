@@ -9,7 +9,7 @@ import colorsys
 from skimage.morphology import remove_small_objects
 
 
-
+merge4 = "maria/count_cells2/Merge-2.4.jpg"
 img_hsv = Image.open(merge4).convert('HSV')
 image_arr_hsv = np.array(img_hsv)
 plt.imshow(image_arr_hsv)
@@ -54,21 +54,20 @@ def HSVColor(img_arr):
         return new_arr
 
 
-
 rgb = HSVColor(np.array(img_hsv))
 
-yellow_channel = np.zeros_like(image_arr_hsv)
-yellow_channel_bin = np.array([[0 for i in range(image_arr_hsv.shape[0])]for j in range(image_arr_hsv.shape[1])])
+yellow_channel2 = np.zeros_like(image_arr_hsv)
+yellow_channel_bin2 = np.array([[0 for i in range(image_arr_hsv.shape[0])]for j in range(image_arr_hsv.shape[1])])
 for i in range(image_arr_hsv.shape[0]):
     for j in range(image_arr_hsv.shape[1]):
-        if image_arr_hsv[i, j, 0] < 59 and image_arr_hsv[i, j, 0] > 40:
-            yellow_channel[i, j] = image_arr_hsv[i, j]
-            yellow_channel_bin[i,j] = 1
+        if image_arr_hsv[i, j, 0] < 59 and image_arr_hsv[i, j, 0] > 40 and image_arr_hsv[i, j, 2] > 50:
+            yellow_channel2[i, j] = image_arr_hsv[i, j]
+            yellow_channel_bin2[i,j] = 1
         else:
-            yellow_channel[i,j] = np.array([0,0,0])
+            yellow_channel2[i,j] = np.array([0,0,0])
 
 
-plt.imshow(HSVColor(yellow_channel))
+plt.imshow(HSVColor(yellow_channel2))
 plt.show()
 
 # corresponding dapi:
@@ -79,4 +78,174 @@ dapi_labelled = count_blue('maria/count_cell_images/dapi_staining/iba1dapi2.4.jp
 
 # count blue not really working.... could do similar to yellow with blue
 
+# try this: https://github.com/luispedro/python-image-tutorial/blob/master/Segmenting%20cell%20images%20(fluorescent%20microscopy).ipynb
+filename='maria/count_cell_images/dapi_staining/iba1dapi2.4.jpg'
+image = np.array(Image.open(filename).convert('L'))
+
+T_otsu = mh.otsu(image)
+print(T_otsu)
+plt.imshow(image > T_otsu)
+# doesn't differentiate between blue and green
+
+img_hsv = Image.open(filename).convert('HSV')
+image_arr_hsv = np.array(img_hsv)
+plt.imshow(image_arr_hsv)
+plt.show()
+
+blue_channel = np.zeros_like(image_arr_hsv)
+blue_channel_bin = np.array([[0 for i in range(image_arr_hsv.shape[0])]for j in range(image_arr_hsv.shape[1])])
+for i in range(image_arr_hsv.shape[0]):
+    for j in range(image_arr_hsv.shape[1]):
+        if image_arr_hsv[i, j, 0] < 270 and image_arr_hsv[i, j, 0] > 160:# and image_arr_hsv[i,j,2] > 150:
+            blue_channel[i, j] = image_arr_hsv[i, j]
+            blue_channel_bin[i,j] = 1
+        else:
+            blue_channel[i,j] = np.array([0,0,0])
+
+plt.imshow(HSVColor(blue_channel))
+
+blue_channel_greyscale = np.array(Image.fromarray(HSVcolor(blue_channel)).convert("L"))
+# now try mahoto stuff....
+T_otsu = mh.otsu(blue_channel_greyscale)
+print(T_otsu)
+plt.imshow(blue_channel_greyscale > T_otsu)
+# automatic threshold doesn't work....
+
+T_mean = blue_channel_greyscale.mean()
+print(T_mean)
+plt.imshow(blue_channel_greyscale > T_mean)
+# still not great, try doing with stdev
+T_mean_stdev = blue_channel_greyscale.mean() + blue_channel_greyscale.std()/2
+print(T_mean_stdev)
+plt.imshow(blue_channel_greyscale > T_mean_stdev)
+
+# have similar issue to with Matts, different parts of the image have different properties
+# so to the left, things we need to exclude are the same colour as things we need to keep on the right
+
+# just try it all the way through with what we have... see if separating touching cells step helps
+
+blue_channel_greyscalef = mh.gaussian_filter(blue_channel_greyscale, 2.)
+T_mean = blue_channel_greyscalef.mean()
+bin_image = blue_channel_greyscalef > T_mean
+plt.imshow(bin_image)
+
+labeled, nr_objects = mh.label(bin_image)
+print(nr_objects)
+
+plt.imshow(labeled)
+plt.jet()
+# nope
+
+maxima = mh.regmax(mh.stretch(blue_channel_greyscalef))
+maxima,_= mh.label(maxima)
+# this works for counting, roughly, but we need ovrlap beween dapi stain and  
+
+dist = mh.distance(bin_image)
+dist = 255 - mh.stretch(dist)
+watershed = mh.cwatershed(dist, maxima)
+plt.imshow(watershed)
+
+# try scipy.ndimage distance transform
+from scipy.ndimage.morphology import distance_transform_edt
+res = distance_transform_edt(blue_channel_greyscale) # better....
+
+# try this directly on the yellow
+
+yellow_channel_greyscale = np.array(Image.fromarray(yellow_channel).convert("L"))
+
+
+yellow_channel_greyscalef = mh.gaussian_filter(yellow_channel_greyscale, 2.)
+T_mean = yellow_channel_greyscalef.mean()
+bin_image = yellow_channel_greyscalef > T_mean
+plt.imshow(bin_image)
+
+yellow_channel_rgb = HSVColor(yellow_channel)
+T_otsu = mh.otsu(yellow_channel_greyscale)
+print(T_otsu)
+plt.imshow(yellow_channel_greyscale > T_otsu)
+
+# the yellow greyscale actually looks reasonable
+
+
+def check_sigma(array, sigma):
+    arrayf = mh.gaussian_filter(array.astype(float), sigma)
+    maxima = mh.regmax(mh.stretch(arrayf))
+    maxima = mh.dilate(maxima, np.ones((5,5)))
+    plt.imshow(arrayf)
+    #plt.imshow(maxima)
+    #plt.imshow(mh.as_rgb(np.maximum(255*maxima, arrayf), arrayf, array > T_mean))
+
+res = distance_transform_edt(yellow_channel_greyscale)
+dist = 255 - mh.stretch(res)
+watershed = mh.cwatershed(dist, maxima)
+plt.imshow(watershed)
+
+# make marker array for labelling
+markers = np.zeros_like(yellow_channel_greyscalef)
+markers[yellow_channel_greyscalef<1] = 1
+markers[yellow_channel_greyscalef>30] = 2
+
+# nope
+elevation_map = sobel(yellow_channel_greyscalef)
+ws = watershed(elevation_map, markers)
+
+from skimage.feature import peak_local_max
+distance = distance_transform_edt(yellow_channel_greyscalef)
+
+# insanely slow....90p[]\]
+local_maxi = peak_local_max(
+    -distance, indices=False, footprint=np.ones((3, 3)))#, labels=yellow_channel_greyscalef)
+
+
+# also doesn't work.....
+markers = ndimage.label(local_maxi)[0]
+labels = watershed(-distance, markers, mask=image)
+
+# the larger you make sigma, the more blurred it gets
+ycf = ndimage.gaussian_filter(yellow_channel_greyscale2, 1)
+bin_image = np.zeros_like(ycf)
+bin_image[ycf>12] = 1
+
+# think that will be ok.... 
+labelled = measure.label(bin_image)
+labels = skimage.morphology.remove_small_objects(labelled, 30)
+
+
+maxima = mh.regmax(mh.stretch(ycf))
+maxima,_= mh.label(maxima)
+plt.imshow(maxima)
+
+
+dist = mh.distance(bin_image)
+plt.imshow(dist)
+
+dist = 255 - mh.stretch(dist)
+watershed = mh.cwatershed(dist, maxima)
+plt.imshow(watershed)
+watershed *= bin_image
+plt.imshow(watershed)
+
+
+# gives best results:
+yellow_channel_greyscale2 = np.array(Image.fromarray(yellow_channel2).convert("L"))
+ycf = ndimage.gaussian_filter(yellow_channel_greyscale2, 1)
+bin_image = np.zeros_like(ycf)
+bin_image[ycf>12] = 1
+
+# think that will be ok.... 
+labelled = measure.label(bin_image)
+labels = skimage.morphology.remove_small_objects(labelled, 30)
+# gives 763 though.... way too many, try same approach with dapi...
+
+
+bcf = ndimage.gaussian_filter(blue_channel_greyscale, 1)
+bin_image2 = np.zeros_like(bcf)
+bin_image2[bcf>10] = 1
+
+# think that will be ok.... 
+labelled_b = measure.label(bin_image2)
+labels_b = skimage.morphology.remove_small_objects(labelled_b, 30)
+
+
+# need to take the two contrast approach with this one....
 
