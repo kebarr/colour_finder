@@ -257,7 +257,11 @@ logarithmic_corrected = exposure.adjust_log(blue_channel_rgb, 10)
 # maybe exact dapi position doesn't matter- if there's dapi thre then there's a nucleus
 
 median_filtered = median_filter_colour_image_array(np.array(Image.fromarray(gamma_corrected).convert("HSV")))
-unsharp_masked = skimage.filters.unsharp_mask(gamma_corrected, radius=5, amount=5, multichannel=True)
 
+gamma_corrected = exposure.adjust_gamma(blue_channel_rgb, 0.95, 0.8)
+unsharp_masked = skimage.filters.unsharp_mask(gamma_corrected, radius=5, amount=20, multichannel=True)
 
+# now try to select dapi staining from there- so exclude cyan (0,1,1)
+# rgb has been scaled to 0, 1, 1
+# allow pink (1,0,1) but not purple, (0.509, 0, 1)
 
