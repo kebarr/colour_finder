@@ -248,9 +248,16 @@ labels_b = skimage.morphology.remove_small_objects(labelled_b, 30)
 
 
 # need to take the two contrast approach with this one....
+blue_channel_rgb = HSVColor(blue_channel)
+# gamma 5 seems ok for left hand side
 
-gamma_corrected = exposure.adjust_gamma(blue_channel_greyscale, 8)
-logarithmic_corrected = exposure.adjust_log(blue_channel_greyscale, 10)
+# gamma below 1 makes the image brighter, but joins up too much stuff
+gamma_corrected = exposure.adjust_gamma(blue_channel_rgb, 0.95, 0.95)
+logarithmic_corrected = exposure.adjust_log(blue_channel_rgb, 10)
 # maybe exact dapi position doesn't matter- if there's dapi thre then there's a nucleus
+
+median_filtered = median_filter_colour_image_array(np.array(Image.fromarray(gamma_corrected).convert("HSV")))
+unsharp_masked = skimage.filters.unsharp_mask(gamma_corrected, radius=5, amount=5, multichannel=True)
+
 
 
