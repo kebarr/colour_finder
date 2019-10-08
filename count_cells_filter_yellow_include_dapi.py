@@ -249,3 +249,8 @@ labels_b = skimage.morphology.remove_small_objects(labelled_b, 30)
 
 # need to take the two contrast approach with this one....
 
+gamma_corrected = exposure.adjust_gamma(blue_channel_greyscale, 8)
+logarithmic_corrected = exposure.adjust_log(blue_channel_greyscale, 10)
+# maybe exact dapi position doesn't matter- if there's dapi thre then there's a nucleus
+
+
