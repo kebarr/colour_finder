@@ -265,3 +265,27 @@ unsharp_masked = skimage.filters.unsharp_mask(gamma_corrected, radius=5, amount=
 # rgb has been scaled to 0, 1, 1
 # allow pink (1,0,1) but not purple, (0.509, 0, 1)
 
+# see if grayscale will make it easier.
+from skimage.color import rgb2gray
+
+unsharp_masked_gs = rgb2gray(unsharp_masked) # nope.....
+
+
+dapi_filter = lambda x: ((x[0] ==0) &  &(x[1] >0.5) (x[2] ==1)) |((x[1] >0.3) &(x[1] <0.5) & (x[0] < 0.2) & (x[2] > 0.9)) |((x[1] <0.2) & (x[0] < 0.6) & (x[2] > 0.3)) |((x[0] <0.05) & (x[1] < 0.6) & (x[2] > 0.3)) |((x[0] <0.1) & (x[1] < 0.1) & (x[2] > 0.3)) | ((x[0] > 0.7) & (x[1] == 0) & (x[2]==1))
+
+dapi_filter = lambda x: ((x[2] > 0.7))
+unsharp_masked = skimage.filters.unsharp_mask(gamma_corrected, radius=5, amount=20, multichannel=True)
+match_arr = np.zeros((unsharp_masked.shape[0], unsharp_masked.shape[1]))
+for i in range(len(unsharp_masked)):
+        for j in range(len(unsharp_masked[i])):
+                if dapi_filter(unsharp_masked[i][j]):
+                    unsharp_masked[i][j] = np.array([1, 1, 1], dtype=np.uint8)
+                    match_arr[i, j] = 1
+
+# now try label, remove small objects, fill holes, convert back to binary, 
+
+# simpler labelling shouldn't need the above
+labelled = measure.label(match_arr)
+
+labelling_final = remove_small_objects(labelled, 10)
+
