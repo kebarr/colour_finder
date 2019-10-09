@@ -258,7 +258,6 @@ logarithmic_corrected = exposure.adjust_log(blue_channel_rgb, 10)
 
 median_filtered = median_filter_colour_image_array(np.array(Image.fromarray(gamma_corrected).convert("HSV")))
 
-gamma_corrected = exposure.adjust_gamma(blue_channel_rgb, 0.95, 0.8)
 unsharp_masked = skimage.filters.unsharp_mask(gamma_corrected, radius=5, amount=20, multichannel=True)
 
 # now try to select dapi staining from there- so exclude cyan (0,1,1)
@@ -271,8 +270,9 @@ from skimage.color import rgb2gray
 unsharp_masked_gs = rgb2gray(unsharp_masked) # nope.....
 
 
-dapi_filter = lambda x: ((x[0] ==0) &  &(x[1] >0.5) (x[2] ==1)) |((x[1] >0.3) &(x[1] <0.5) & (x[0] < 0.2) & (x[2] > 0.9)) |((x[1] <0.2) & (x[0] < 0.6) & (x[2] > 0.3)) |((x[0] <0.05) & (x[1] < 0.6) & (x[2] > 0.3)) |((x[0] <0.1) & (x[1] < 0.1) & (x[2] > 0.3)) | ((x[0] > 0.7) & (x[1] == 0) & (x[2]==1))
 
+blue_channel_rgb = HSVColor(blue_channel)
+gamma_corrected = exposure.adjust_gamma(blue_channel_rgb, 0.95, 0.8)
 dapi_filter = lambda x: ((x[2] > 0.7))
 unsharp_masked = skimage.filters.unsharp_mask(gamma_corrected, radius=5, amount=20, multichannel=True)
 match_arr = np.zeros((unsharp_masked.shape[0], unsharp_masked.shape[1]))
@@ -287,5 +287,35 @@ for i in range(len(unsharp_masked)):
 # simpler labelling shouldn't need the above
 labelled = measure.label(match_arr)
 
-labelling_final = remove_small_objects(labelled, 10)
+labelling_final = measure.label(remove_small_objects(labelled, 10))
+
+# test function on all other dapi stainings
+dapi_dir = 'maria/count_cell_images/dapi_staining/'
+dapi_image_files = [filename for filename in os.listdir(dapi_dir) if filename.endswith(".jpg")] 
+
+dapi_labels = []
+for filename in dapi_image_files:
+    file_path = dapi_dir + filename
+    print(file_path)
+    dapi = HSVColor(isolate_blue(file_path))
+    labeled = label_dapi(dapi)
+    print("found %d cells in %s" % (np.max(labeled), file_path))
+    #plt.imshow(labeled)
+    #plt.show()
+    plt.imshow(labeled)
+    plt.savefig(dapi_dir + filename.split('.jpg')[0] + 'found.png')
+    dapi_labels.append(labeled)
+
+
+#found 812 cells in maria/count_cell_images/dapi_staining/iba1dapi3.2.jpg
+#found 782 cells in maria/count_cell_images/dapi_staining/iba1dapi3.3.jpg
+#found 1000 cells in maria/count_cell_images/dapi_staining/iba1dapi1.1.jpg
+#found 923 cells in maria/count_cell_images/dapi_staining/iba1dapi1.3.jpg
+#found 591 cells in maria/count_cell_images/dapi_staining/iba1dapi3.1.jpg
+#found 862 cells in maria/count_cell_images/dapi_staining/iba1dapi1.2.jpg
+#found 768 cells in maria/count_cell_images/dapi_staining/iba1dapi2.1.jpg
+#found 757 cells in maria/count_cell_images/dapi_staining/iba1dapi2.2.jpg
+#found 752 cells in maria/count_cell_images/dapi_staining/iba1dapi2.3.jpg
+#found 793 cells in maria/count_cell_images/dapi_staining/iba1dapi2.4.jpg
+
 
