@@ -319,3 +319,25 @@ for filename in dapi_image_files:
 #found 793 cells in maria/count_cell_images/dapi_staining/iba1dapi2.4.jpg
 
 
+# now try combining information from blue and yellow channels
+merge4 = "maria/count_cells2/Merge-2.4.jpg"
+img_hsv = Image.open(merge4).convert('HSV')
+image_arr_hsv = np.array(img_hsv)
+
+yellow_channel = np.zeros_like(image_arr_hsv)
+yellow_channel_bin = np.array([[0 for i in range(image_arr_hsv.shape[0])]for j in range(image_arr_hsv.shape[1])])
+for i in range(image_arr_hsv.shape[0]):
+    for j in range(image_arr_hsv.shape[1]):
+        if image_arr_hsv[i, j, 0] < 50 and image_arr_hsv[i, j, 0] > 37 and image_arr_hsv[i, j, 2] > 50 and image_arr_hsv[i, j, 1] > 100:
+            yellow_channel[i, j] = image_arr_hsv[i, j]
+            yellow_channel_bin[i,j] = 1
+        else:
+            yellow_channel[i,j] = np.array([0,0,0])
+
+yellow_channel_greyscale = np.array(Image.fromarray(yellow_channel).convert("L"))
+ycf = ndimage.gaussian_filter(yellow_channel_greyscale, 1)
+bin_image = np.zeros_like(ycf)
+bin_image[ycf>12] = 1
+
+bin_labelled = measure.label(bin_image)
+bin_labelled_final = remove_small_objects(bin_labelled)
