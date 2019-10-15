@@ -207,6 +207,10 @@ edges = feature.canny(im_denoised, sigma=0.2, low_threshold=0.07, \
 plt.imshow(im_denoised, cmap='gray')
 plt.contour(edges)
 
+from skimage import morphology
+markers = np.zeros(im_denoised.shape, dtype=np.int)
+markers[x.astype(np.int), y.astype(np.int)] = np.arange(len(x)) + 1
+markers = morphology.dilation(markers, morphology.disk(7))
 hat = ndimage.black_tophat(im_denoised, 7)
 # Combine with denoised image
 hat -= 0.3 * im_denoised
@@ -370,4 +374,17 @@ final_segmentation = segmentation.random_walker(im_denoised[::2, ::2][:278, :278
 plt.imshow(color.label2rgb(final_segmentation, im_denoised[::2, ::2],
                     colors=plt.cm.gist_rainbow(np.linspace(0, 1, 40))))
 ax = plt.axis('off')
+
+plt.imshow(np.random.permutation(final_segmentation.max() + 1)
+                                    [final_segmentation], 
+                                    cmap='inferno')
+ax = plt.axis('off')
+
+
+plt.imshow(np.random.permutation(final_segmentation.max() + 1)
+                                    [final_segmentation], 
+                                    cmap='rainbow')
+
+ax = plt.axis('off')
+plt.show()
 

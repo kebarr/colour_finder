@@ -340,4 +340,26 @@ bin_image = np.zeros_like(ycf)
 bin_image[ycf>12] = 1
 
 bin_labelled = measure.label(bin_image)
-bin_labelled_final = remove_small_objects(bin_labelled)
+bin_labelled_final = remove_small_objects(bin_labelled, 15)
+
+# now need to co-localise with dapi
+props = measure.regionprops(bin_labelled_final, ycf)
+
+# want to draw the dapi regions where yellow has been found
+
+
+
+
+
+
+
+
+
+
+
+
+import skimage.segmentation as seg
+image_slic = seg.slic(HSVColor(image_arr_hsv),n_segments=2000)
+
+image_felzenszwalb = seg.felzenszwalb(HSVColor(image_arr_hsv)) 
+
