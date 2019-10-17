@@ -60,19 +60,19 @@ def overlaps_dapi_region(prop, dapi_labels):
     if np.any(slice_in_dapi_labels != 0): # nonzero value corresponds to label!!
         image = np.zeros_like(prop.image, dtype=np.int16)
         print("image shape: ", image.shape)
-        for i in range(len(prop.image)):
-            for j in range(len(prop.image[i])):
-                if prop.image[i,j] == True:
-                    image[i,j] = 1
+        #for i in range(len(prop.image)):
+        #    for j in range(len(prop.image[i])):
+        #        if prop.image[i,j] == True:
+        #            image[i,j] = 1
         for i in range(len(slice_in_dapi_labels)):
             for j in range(len(slice_in_dapi_labels[i])):
                 if slice_in_dapi_labels[i, j] != 0:
                     #image[i,j] = slice_in_dapi_labels[i, j]
-                    image[i,j] = 2
+                    #image[i,j] = 2
                     print("slice in dapi labels: %d, i: %d, j: %d" % (slice_in_dapi_labels[i, j], i, j))
-        print(image)
-        plt.imshow(image)
-        plt.show()
+        #print(image)
+        #plt.imshow(image)
+        #plt.show()
         return set(slice_in_dapi_labels[np.where(slice_in_dapi_labels != 0)])
     return set() 
 
@@ -153,39 +153,55 @@ def isolate_yellow(yellow_filename):
             else:
                 yellow_channel[i,j] = np.array([0,0,0])
     yellow_channel_greyscale = np.array(Image.fromarray(HSVColor(yellow_channel)).convert("L"))
-    ycf = gaussian_filter(yellow_channel_greyscale, 3)
+    ycf = gaussian_filter(yellow_channel_greyscale, 4)
+    plt.imshow(ycf)
+    plt.show()
     bin_image = np.zeros_like(ycf)
-    bin_image[ycf>4] = 1
+    bin_image[ycf>3] = 1
     bin_labelled = measure.label(bin_image)
     bin_labelled_final = remove_small_objects(bin_labelled, 15)
     props = measure.regionprops(bin_labelled_final, ycf)
     return props, bin_labelled_final
 
+
 def compare_yellow_dapi(yellow_filename, dapi_filename):
     blue = isolate_blue(dapi_filename)
     labelled_dapi = label_dapi(blue)
-    plt.imshow(labelled_dapi)
-    plt.show()
     yellow_props, bin_labelled_final = isolate_yellow(yellow_filename)
     # now need to co-localise with dapi
     overlapping_dapi= set()
+    yellow_with_dapi = 0
+    overlaps = []
     for prop in yellow_props:
         res = overlaps_dapi_region(prop, labelled_dapi)
+        if res != set():
+            yellow_with_dapi += 1
+            overlaps.append(prop)
         overlapping_dapi = overlapping_dapi.union(res)
+    print("yellow_with_dapi: %d" % yellow_with_dapi)
     # want to draw the dapi regions where yellow has been found
     # make an empty array and draw all the dapi labels
     dapi_gs= color.rgb2gray(blue)
     props_dapi = measure.regionprops(labelled_dapi, dapi_gs)
     # map over yellow to show which have been counted
     for label in overlapping_dapi:
-        prop = props_dapi[label]
+        prop = props_dapi[label-1]
         for coord in prop.coords:
             bin_labelled_final[coord[0], coord[1]] = 300
-    return bin_labelled_final, overlapping_dapi
+    yellow_selected = np.zeros_like(dapi_gs)
+    for p in yellow_props:
+        for coord in p.coords:
+            yellow_selected[coord[0], coord[1]]=1
+    for prop in props_dapi:
+        for coord in prop.coords:
+            yellow_selected[coord[0], coord[1]] = 2
+    plt.imshow(yellow_selected)
+    plt.show()
+    return bin_labelled_final, overlapping_dapi, props_dapi
 
 
 
-overlapping_image, overlapping_labels = compare_yellow_dapi(merge4, dapi24)
+overlapping_image, overlapping_labels, props_dapi = compare_yellow_dapi(merge4, dapi24)
 
 # looking at each individually, there is an overlap- so something is wrong with the visualisation
 
