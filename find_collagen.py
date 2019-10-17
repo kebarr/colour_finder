@@ -136,7 +136,7 @@ for i in range(len(image_arr)):
 plt.imshow(image_arr)
 plt.show()
 
-luis = os.listdir('Images_from_luis')
+luis = os.listdir('Images_from_luis/katie')
 
 for l in luis:
         if l.endswith('.tif'):
@@ -204,13 +204,12 @@ plt.imshow(image_arr)
 
 for l in luis:
         if l.endswith('.tif'):
-                filename = '../Images_from_luis/' + l
+                filename = 'Images_from_luis/katie/' + l
                 #print(filename)
                 img = Image.open(filename)
                 img.load()
                 image_arr = np.array(img)
-                #filter = lambda x: (x[0] < 20) & (x[1] < 60)  #& (150 < x[2])
-                filter = lambda x: ((20 < x[0] < 40) & (15 < x[1] <35) & (65 < x[2]<95) | (x[0] < 100) & (120 < x[2]<255)| (130 < x[0] < 190) & (150 < x[1] <190) & (190 < x[2]<255) | (100 < x[0] < 120) & (140 < x[1] <165) & (190 < x[2]<255)  | (200 < x[0] < 210) & (205 < x[1] <220) & (220 < x[2]<235))
+                filter = lambda x: ((20 < x[0] < 40) & (15 < x[1] <35) & (65 < x[2]<95) | (x[0] < 100) & (120 < x[2]<255)| (130 < x[0] < 187) & (150 < x[1] <187) & (192 < x[2]<255) | (100 < x[0] < 120) & (140 < x[1] <165) & (190 < x[2]<255)  | (200 < x[0] < 210) & (205 < x[1] <220) & (220 < x[2]<235))
                 blue = 0
                 res = np.zeros((image_arr.shape[0], image_arr.shape[1]))
                 for i in range(len(image_arr)):
@@ -220,11 +219,42 @@ for l in luis:
                                         blue+= 1
                 plt.imshow(image_arr)
                 #plt.show()
-                plt.savefig(filename.split('.tif')[0]+"blue_highlighted2.png")
+                plt.savefig(filename.split('.tif')[0]+"blue_highlighted.png")
                 print("%d blue pixels in %s" % (blue, filename))
 
 
+filename = 'Images_from_luis/katie/61-3 month RE__01.tif'
+img = Image.open(filename)
+img.load()
+image_arr = np.array(img)
+filter = lambda x: ((20 < x[0] < 40) & (15 < x[1] <35) & (65 < x[2]<95) | (x[0] < 100) & (120 < x[2]<255)| (130 < x[0] < 187) & (150 < x[1] <187) & (192 < x[2]<255) | (100 < x[0] < 120) & (140 < x[1] <165) & (190 < x[2]<255)  | (200 < x[0] < 210) & (205 < x[1] <220) & (220 < x[2]<235))
+blue = 0
+res = np.zeros((image_arr.shape[0], image_arr.shape[1]))
+for i in range(len(image_arr)):
+        for j in range(len(image_arr[i])):
+                if filter(image_arr[i][j]):
+                        image_arr[i][j] = np.array([255, 238, 0, ], dtype=np.uint8)
+                        blue+= 1
+plt.imshow(image_arr)
+
+# just test something.....
 
 
-# for marias next: https://scikit-image.org/docs/dev/user_guide/tutorial_segmentation.html
-# countour hierarchy may work to count cells with visible nuclei
+filter = lambda x: (x[0] ==1 and x[1] == 1) | (x[2] >10 ) | (x[0]==x[1] and x[1] == x[2])
+test_array = np.array([[[1,2,3],[1,2,5],[1,2,18],[6,1,1],[6,1,15],[6,1,12],[1,1,1],[2,2,2],[6,1,12],[6,1,1],[2,2,2],[4,5,6]]])
+test_array_bool = np.array(list(map(filter, test_array)))
+
+# to improve performance, try making mask:
+filter = lambda x: ((20 < x[0] < 40) & (15 < x[1] <35) & (65 < x[2]<95) | (x[0] < 100) & (120 < x[2]<255)| (130 < x[0] < 187) & (150 < x[1] <187) & (192 < x[2]<255) | (100 < x[0] < 120) & (140 < x[1] <165) & (190 < x[2]<255)  | (200 < x[0] < 210) & (205 < x[1] <220) & (220 < x[2]<235))
+bitmap = (((image_arr[:,:,0] > 20) & (image_arr[:,:,0] < 40)) & ((image_arr[:,:,1] > 15) & (image_arr[:,:,1] < 35)) & ((image_arr[:,:,2] > 65) & (image_arr[:,:,2] < 95))) | \
+        ((image_arr[:,:,0] < 100) & ((image_arr[:,:,1] > 15) & (image_arr[:,:,1] < 35)) & ((image_arr[:,:,2] > 120) & (image_arr[:,:,2] < 225))) | \
+        (((image_arr[:,:,0] > 100) & (image_arr[:,:,0] < 120)) & ((image_arr[:,:,1] > 140) & (image_arr[:,:,1] < 165)) & ((image_arr[:,:,2] > 190) & (image_arr[:,:,2] < 255))) |\
+        (((image_arr[:,:,0] > 200) & (image_arr[:,:,0] < 210)) & ((image_arr[:,:,1] > 205) & (image_arr[:,:,1] < 220)) & ((image_arr[:,:,2] > 220) & (image_arr[:,:,2] < 235))) 
+
+image_arr[bitmap==True] = [255, 255, 0]
+
+np.sum(np.where(bitmap==False))
+# (130 < x[0] < 187) & (150 < x[1] <187) & (192 < x[2]<255)
+# (100 < x[0] < 120) & (140 < x[1] <165) & (190 < x[2]<255) 
+# (200 < x[0] < 210) & (205 < x[1] <220) & (220 < x[2]<235))
+
