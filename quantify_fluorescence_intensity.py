@@ -1,5 +1,9 @@
 from scipy.ndimage.morphology import binary_dilation
 import matplotlib
+from scipy.ndimage.morphology import binary_dilation
+import numpy as np
+from PIL import Image
+import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from skimage.filters import sobel
@@ -22,8 +26,6 @@ def get_injection_site_props(image_arr, pixel_thresh=80, thresh_object=500, thre
     labels = measure.label(markers)
     labels_filtered = skimage.morphology.remove_small_objects(labels, thresh_object)
     labels_final = measure.label(skimage.morphology.remove_small_holes(labels_filtered, thresh_hole))
-    plt.imshow(labels_final)
-    plt.show()
     props = measure.regionprops(labels_final, image_arr)
     # exclude label for entirey of image
     entire_area = image_arr.shape[0]*image_arr.shape[1]
@@ -55,9 +57,8 @@ def compare_intensities(image_arr, injection_site, out_filename):
         mask[x,y] = 1
     plt.imshow(mask)
     plt.savefig(out_filename)
-    # smallest ditance outwards
+    # smallest distance outwards
     iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/4)
-    print(iterations_needed)
     intensity = np.sum(image_arr)# so first intensity will actually be intensity of everything outside mask
     res = IntensityResults()
     area = np.sum(mask)
@@ -72,7 +73,9 @@ def compare_intensities(image_arr, injection_site, out_filename):
         area = np.sum(mask)
     return res
 
-
+matt_test_image = 'matt/MAX_Iba1.tif'
 image_arr =open_image(matt_test_image)
-injection_site = get_injection_site_props(image_arr)
+injection_site = get_injection_site_props(image_arr, 70, 100000, 100000)
+intensities = compare_intensities(image_arr, injection_site,"matt/MAX_Iba1_max.png")
 
+final = intensities.average_intensity_per_region()
