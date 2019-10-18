@@ -453,4 +453,7 @@ plt.show()
 # corresponding dapi:
 dapi24 = 'count_cell_images/dapi_standing/iba1dapi2.4.jpg'
 
+# for dapi i need to remove small objects too
+
+
 

@@ -4,18 +4,10 @@ from scipy.ndimage.morphology import binary_dilation
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-#from skimage.filters import sobel
-#from skimage.morphology import watershed
 from skimage import measure
-#from scipy.ndimage import median_filter
 from skimage.color import label2rgb
 import os
 from skimage import morphology
-from pyamg.graph import vertex_coloring
-#from skimage import feature, color
-#from skimage.transform import hough_circle
-#from skimage.feature import peak_local_max
-#from skimage.draw import circle_perimeter
 
 
 img = Image.open("matt/matt_neun_smaller.png").convert("L")

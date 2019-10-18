@@ -82,3 +82,10 @@ def count_cells_neun(filename):
     number_cells = count_cells_simple(props_low_contrast)
     print("%d cells found using naive method" % number_cells)
     print("found %d cells found in total %s"% (len(overlapping)+number_cells, filename))
+
+
+count_cells_neun("matt/matt_neun_smaller.png") # 2488
+
+# now need to quantify cells in ranges of x pixels from center
+# so need to isolate center
+
