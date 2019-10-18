@@ -71,50 +71,70 @@ def count_cells_neun(filename):
     # for cell counting, will need props of all cells counted
     return props_low_contrast_filtered + props_high_contrast_filtered
 
-cell_props = count_cells_neun("matt/matt_neun_smaller.png") # 2488
 
-# now need to quantify cells in ranges of x pixels from center
-# so need to isolate center - try previous method
+# create bitmap of centroids - then will be the same as intensity finding
 
-image_arr =open_image("matt/matt_neun_smaller.png")
-injection_site = get_injection_site_props(image_arr, 70, 100, 200)
+def create_centroid_bitmap(x_dim, y_dim, props):
+    bitmap = np.zeros((x_dim, y_dim))
+    number_added = 0
+    for p in props:
+        centroid = p.centroid
+        x_coord = int(centroid[0])
+        y_coord = int(centroid[1])
+        bitmap[x_coord, y_coord] = 1
+        number_added += 1
+    print("added %d points to bitmap" % number_added)
+    return bitmap
+
+class IntensityResults(object):
+    def __init__(self):
+        self.sums = []
+        self.region_intensities = []
+        self.areas = []
+
+    def average_intensity_per_region(self):
+        return [int(i)/int(a) for i,a in zip(self.region_intensities, self.areas)]
+
 
 # base counting specific distances from hole on previous intensity counting one 
-def compare_intensities(cell_props, injection_site, out_filename):
+def compare_intensities(image_arr, injection_site, iteration_length, out_filename):
     injection_site_coords = injection_site.coords
     mask = np.zeros_like(image_arr)
     for x, y in injection_site_coords:
         mask[x,y] = 1
     plt.imshow(mask)
     plt.savefig(out_filename)
+    pixels_per_iteration = iteration_length*4 # assume that its 4 pixels per micro (?) meter
     # smallest distance outwards
-    iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/4)
-    intensity = np.sum(image_arr)# so first intensity will actually be intensity of everything outside mask
+    iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/pixels_per_iteration)
+    total_cells = np.sum(image_arr)# so first intensity will actually be intensity of everything outside mask
     res = IntensityResults()
     area = np.sum(mask)
+    intensity = np.sum(image_arr)
     for i in range(iterations_needed):
         masked = np.ma.masked_array(image_arr,mask)
         # intensity in region is total intensity including region - total instensity excluding region
         res.region_intensities.append(intensity-np.sum(masked))
         intensity = np.sum(masked)
         res.sums.append(intensity)
-        mask = binary_dilation(mask, iterations=4)
+        mask = binary_dilation(mask, iterations=pixels_per_iteration)
+        plt.imshow(mask)
+        plt.show()
         res.areas.append(np.sum(mask)-area)
         area = np.sum(mask)
     return res
 
+cell_props = count_cells_neun("matt/matt_neun_smaller.png") 
+image_arr =open_image("matt/matt_neun_smaller.png")
+injection_site = get_injection_site_props(image_arr, 70, 100, 200)
+centroid_bitmap = create_centroid_bitmap(image_arr.shape[0], image_arr.shape[1], cell_props)
+region_comparisons = compare_intensities(centroid_bitmap, injection_site, 5, "test.png")
 
-# cells furthest out are in all regions. no cells are in central region
-# don't want to have to iterate over all props for each region
-# create bitmap of centroids - then will be the same as intensity finding
-
-def create_centroid_bitmap(x_dim, y_dim, props):
-    bitmap = np.zeros((x_dim, y_dim))
-    for p in props:
-        centroid = p.centroid
-        x_coord = int(centroid[0])
-        y_coord = int(centroid[1])
-        bitmap[x_coord, y_coord] = 1
-    return bitmap
-
+# think it just looks like some are missing, when you zoom in, its fine
+im = np.zeros_like(image_arr)
+im2 = np.zeros_like(image_arr)
+for p in cell_props:
+    for x, y in p.coords:
+        im[x,y] = 1
+    im2[int(p.centroid[0]), int(p.centroid[1])] = 1
 
