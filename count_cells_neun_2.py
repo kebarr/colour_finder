@@ -49,6 +49,20 @@ for prop in props_low_contrast_filtered:
 # then use similar approach to with marias dapi image
 # lower contrast will have more amalgamated blobs, need to separate them based on high contrast image
 
+
+def count_cells_simple(props):
+    euler_numbers = [p.euler_number for p in props[1:]]
+    # euler number of 1= no holes, 
+    total_cells = 0
+    for e in euler_numbers:
+        if e == 0 or e == 1:
+            total_cells += 1
+        else:
+            # euler number is 1 - number of holes, so number of cells is -euler_number + 1
+            total_cells += abs(e) + 1
+    return total_cells
+
+    
 def get_labelled_array(image_arr, gamma, binary_threshold):
     gamma_corrected = exposure.adjust_gamma(image_arr, gamma)
     binary = np.zeros_like(gamma_corrected)
@@ -73,8 +87,8 @@ def count_cells_neun(filename):
     plt.imshow(labels_low_contrast)
     plt.show()
     labels_high_contrast = get_labelled_array(image_arr, 100, 200)
-    props_low_contrast = measure.regionprops(labels, image_arr) 
-    props_high_contrast = measure.regionprops(labels, image_arr)
+    props_low_contrast = measure.regionprops(labels_low_contrast, image_arr) 
+    props_high_contrast = measure.regionprops(labels_high_contrast, image_arr)
     print(len(props_low_contrast))
     # large low contrast labels are likely to be multiple cells 
     props_low_contrast_large = [p for p in props_low_contrast if len(p.coords)>25 and len(p.coords) < 100]

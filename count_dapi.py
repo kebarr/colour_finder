@@ -112,7 +112,10 @@ def compare_yellow_dapi(yellow_filename, dapi_filename):
     for prop in props_dapi:
         for coord in prop.coords:
             yellow_selected[coord[0], coord[1]] = 2
-    return yellow_selected, overlapping_dapi
+    plt.imshow(yellow_selected)
+    filename = yellow_filename.split(".jpg")[0] + "_dapi_yellow_combined.png"
+    plt.savefig(filename)
+    print("located %d cells in %s" %(len(overlapping_dapi), yellow_filename))
 
 
 dapi24 = 'maria/count_cell_images/dapi_staining/iba1dapi2.4.jpg'
@@ -120,5 +123,49 @@ merge4 = "maria/count_cells2/Merge-2.4.jpg"
 overlapping_image, overlapping_labels = compare_yellow_dapi(merge4, dapi24)
 
 
+# now try and run for all....
+maria_images = os.listdir("maria/count_cell_images")
+merge_images = sorted([im for im in maria_images if im.startswith('Merge') and im.endswith('-1.jpg')])
+maria_images2 = os.listdir("maria/count_cells2")
+merge_images2 = sorted([im for im in maria_images2 if im.startswith('Merge') and im.endswith('.jpg')])
+merge_final = sorted(merge_images+merge_images2)
 
+dapi_images = os.listdir("maria/count_cell_images/dapi_staining")
+dapi_images = sorted([im for im in dapi_images if im.endswith('.jpg')])
+
+for di, mi in zip(dapi_images, merge_final):
+    di = "maria/count_cell_images/dapi_staining/" + di
+    mi = "maria/count_cell_images/" + mi
+    compare_yellow_dapi(mi, di)
+#found 264 green cells in maria/count_cells2/IBA1-1.1.jpeg
+#found 505 green cells in ../maria/count_cell_images/IBA1-1.2.jpg
+#found 325 green cells in ../maria/count_cell_images/IBA1-1.3.jpg
+#found 442 green cells in ../maria/count_cell_images/IBA1-2.1.jpg
+#found 514 green cells in ../maria/count_cell_images/IBA1-2.2.jpg
+#found 451 green cells in ../maria/count_cell_images/IBA1-2.3.jpg
+# found 449 green cells in maria/count_cells2/IBA1-2.4.jpeg
+#found 394 green cells in ../maria/count_cell_images/IBA1-3.1.jpg
+#found 298 green cells in ../maria/count_cell_images/IBA1-3.2.jpg
+#found 323 green cells in ../maria/count_cell_images/IBA1-3.3.jpg
+# output:
+#yellow_with_dapi: 113 - 42%
+#located 343 cells in maria/count_cell_images/Merge-1.1.jpg - 67%
+#yellow_with_dapi: 157 - 31%
+#located 420 cells in maria/count_cell_images/Merge-1.2-1.jpg - more!!
+#yellow_with_dapi: 117 - 36%
+#located 348 cells in maria/count_cell_images/Merge-1.3-1.jpg
+#yellow_with_dapi: 114 - 26%
+#located 211 cells in maria/count_cell_images/Merge-2.1.jpg
+#yellow_with_dapi: 108 - 21%
+#located 239 cells in maria/count_cell_images/Merge-2.2.jpg
+#yellow_with_dapi: 103 -23%
+#located 223 cells in maria/count_cell_images/Merge-2.3-1.jpg
+#yellow_with_dapi: 73 - 16%
+#located 116 cells in maria/count_cell_images/Merge-2.4.jpg
+#yellow_with_dapi: 83 - 21%
+#located 198 cells in maria/count_cell_images/Merge-3.1-1.jpg
+#yellow_with_dapi: 103 - 34%
+#located 209 cells in maria/count_cell_images/Merge-3.2-1.jpg
+#yellow_with_dapi: 130 - 40%
+#located 388 cells in maria/count_cell_images/Merge-3.3-1.jpg
 

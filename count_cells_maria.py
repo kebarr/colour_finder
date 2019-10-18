@@ -306,7 +306,7 @@ def count_cells(to_count, original_array, outfile, filter=False):
     if filter:
         labels = skimage.morphology.remove_small_objects(labels, 10)
     plt.imshow(labels)
-    plt.savefig(outfile)
+    plt.show()
     props = measure.regionprops(labels, original_array)
     euler_numbers = [p.euler_number for p in props[1:]]
     # euler number of 1= no holes, 
