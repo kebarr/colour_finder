@@ -1,5 +1,9 @@
 from scipy.ndimage.morphology import binary_dilation
 import matplotlib
+from scipy.ndimage.morphology import binary_dilation
+import numpy as np
+from PIL import Image
+import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import skimage
@@ -9,7 +13,7 @@ import os
 from skimage import morphology
 from skimage import exposure
 
-# not sure we need this....
+# does make a difference....
 def count_cells_simple(props):
     euler_numbers = [p.euler_number for p in props[1:]]
     # euler number of 1= no holes, 
