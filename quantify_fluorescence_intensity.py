@@ -57,32 +57,54 @@ class IntensityResults(object):
 def compare_intensities(image_arr, injection_site, iteration_length, iterations_needed):
     injection_site_coords = injection_site.coords
     mask = np.zeros_like(image_arr)
+    print(mask.shape)
+    print(np.sum(mask))
+    print(np.sum(~mask))
     for x, y in injection_site_coords:
         mask[x,y] = 1
+    print(mask.shape)
     print(np.sum(mask))
-    # problem is that first intensity is entire image- initial mask, 
-    print(np.sum(mask))
-    plt.imshow(mask)
-    plt.show()
+    print(np.sum(~mask))
+    print("sum masked and not masked: ", np.sum(mask) + np.sum(~mask))
+    initial_area = np.sum(mask)
+    # problem is that first intensity is entire image- initial mask, need 
     pixels_per_iteration = iteration_length*7 # 7 pixels per micro meter
+    masked = np.ma.masked_array(image_arr,mask=~mask)
+    intensity_of_first_mask = np.sum(masked.compressed())
     mask = binary_dilation(mask, iterations=pixels_per_iteration)
-    masked = np.ma.masked_array(image_arr,mask)
+    print(mask.shape)
+    print(np.sum(mask))
+    print(np.sum(~mask))
+    print("sum masked and not masked: ", np.sum(mask) + np.sum(~mask))
+    masked = np.ma.masked_array(image_arr,mask=~mask)
     # smallest distance outwards
     #iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/pixels_per_iteration)
-    intensity = np.sum(image_arr)-np.sum(masked)# so first intensity will actually be intensity of everything outside mask
+    intensity = np.sum(masked.compressed()) - intensity_of_first_mask # so first intensity will actually be intensity of everything outside mask
+    #print("intenstiy %d first mask %d" % (intensity, intensity_of_first_mask))
+    print(intensity)
+    print(np.sum(masked.compressed()))
     res = IntensityResults()
-    area = np.sum(mask)
+    print(initial_area, masked.sum())
+    area = np.sum(mask) - initial_area
+    print("initial area:%d , area: %d" %(initial_area, area))
+    res.areas.append(area)
     for i in range(iterations_needed):
         # intensity in region is total intensity including region - total instensity excluding region
         res.region_intensities.append(intensity)
-        intensity = np.sum(masked)
-        res.sums.append(intensity)
+        print(intensity, np.sum(masked))
         mask = binary_dilation(mask, iterations=pixels_per_iteration)
-        plt.imshow(mask)
-        plt.show()
-        res.areas.append(np.sum(mask)-area)
+        print(mask.shape)
+        print(np.sum(mask))
+        print(np.sum(~mask))
+        print("sum masked and not masked: ", np.sum(mask) + np.sum(~mask))
+        masked = np.ma.masked_array(image_arr,mask=~mask)
+        intensity = np.sum(masked) - intensity
+        print(intensity)
+        res.areas.append(np.sum(mask)-area)    
         area = np.sum(mask)
         print("finished iteration %d" %i)
+    print(res.areas)
+    print(res.region_intensities)
     return res
 
 matt_test_image = 'matt/MAX_Iba1.tif'
