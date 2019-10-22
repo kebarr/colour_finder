@@ -67,18 +67,11 @@ def compare_intensities(image_arr, injection_site, iteration_length, iterations_
     intensity_of_first_mask = np.sum(masked.compressed())
     print("intensity_of_first_mask: ", np.sum(masked.compressed()))
     mask = binary_dilation(mask, iterations=pixels_per_iteration)
-    print(mask.shape)
-    print(np.sum(mask))
-    print("sum masked and not masked: ", np.sum(mask) + np.sum(~mask))
     masked = np.ma.masked_array(image_arr,mask=~mask)
-    # smallest distance outwards
-    #iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/pixels_per_iteration)
     intensity = np.sum(masked.compressed()) - intensity_of_first_mask # so first intensity will actually be intensity of everything outside mask
-    #print("intenstiy %d first mask %d" % (intensity, intensity_of_first_mask))
     print(intensity)
     print("sum masked compressed:", np.sum(masked.compressed()))
     res = IntensityResults()
-    print(initial_area, masked.sum())
     area = np.sum(mask) - initial_area
     print("initial area:%d , area: %d" %(initial_area, area))
     res.areas.append(area)
@@ -86,10 +79,12 @@ def compare_intensities(image_arr, injection_site, iteration_length, iterations_
         # intensity in region is total intensity including region - total instensity excluding region
         res.region_intensities.append(intensity)
         print("intensity etc, ", intensity, np.sum(masked))
+        intensity = np.sum(masked.compressed())
+        print("intensity reassigned %d" % intensity)
         mask = binary_dilation(mask, iterations=pixels_per_iteration)
         masked = np.ma.masked_array(image_arr,mask=~mask)
-        intensity = np.sum(masked) - intensity
-        print("intensity: ", intensity)
+        intensity = np.sum(masked.compressed()) - intensity
+        print("after operation, intensity etc, ", intensity, np.sum(masked))
         res.areas.append(np.sum(mask)-area)    
         area = np.sum(mask)
         print("finished iteration %d" %i)
