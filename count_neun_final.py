@@ -107,10 +107,9 @@ def compare_intensities(image_arr, injection_site, iteration_length, out_filenam
     pixels_per_iteration = iteration_length*4 # assume that its 4 pixels per micro (?) meter
     # smallest distance outwards
     iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/pixels_per_iteration)
-    total_cells = np.sum(image_arr)# so first intensity will actually be intensity of everything outside mask
+    intensity = np.sum(image_arr)# so first intensity will actually be intensity of everything outside mask
     res = IntensityResults()
     area = np.sum(mask)
-    intensity = np.sum(image_arr)
     for i in range(iterations_needed):
         masked = np.ma.masked_array(image_arr,mask)
         # intensity in region is total intensity including region - total instensity excluding region
@@ -129,6 +128,8 @@ image_arr =open_image("matt/matt_neun_smaller.png")
 injection_site = get_injection_site_props(image_arr, 70, 100, 200)
 centroid_bitmap = create_centroid_bitmap(image_arr.shape[0], image_arr.shape[1], cell_props)
 region_comparisons = compare_intensities(centroid_bitmap, injection_site, 5, "test.png")
+
+final = region_comparisons.average_intensity_per_region()
 
 # think it just looks like some are missing, when you zoom in, its fine
 im = np.zeros_like(image_arr)
