@@ -48,7 +48,10 @@ class IntensityResults(object):
     def __init__(self):
         self.sums = []
         self.region_intensities = []
-        self.areas = []
+        self.intensities_in_masks = []
+        self.areas_full = []
+        self.areas_with_previous_subtracted = []
+
 
     def average_intensity_per_region(self):
         return [int(i)/int(a) for i,a in zip(self.region_intensities, self.areas)]
@@ -78,6 +81,7 @@ def compare_intensities(image_arr, injection_site, iteration_length, iterations_
         res.region_intensities.append(intensity)
         intensity = np.sum(masked.compressed())
         area = np.sum(mask)
+        print("area: ", area)
         mask = binary_dilation(mask, iterations=pixels_per_iteration)
         masked = np.ma.masked_array(image_arr,mask=~mask)
         intensity = np.sum(masked.compressed()) - intensity   
