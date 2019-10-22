@@ -65,29 +65,25 @@ def compare_intensities(image_arr, injection_site, iteration_length, iterations_
     pixels_per_iteration = iteration_length*7 # 7 pixels per micro meter
     masked = np.ma.masked_array(image_arr,mask=~np.array(mask, dtype=bool))
     intensity_of_first_mask = np.sum(masked.compressed())
-    print("intensity_of_first_mask: ", np.sum(masked.compressed()))
     mask = binary_dilation(mask, iterations=pixels_per_iteration)
     masked = np.ma.masked_array(image_arr,mask=~mask)
     intensity = np.sum(masked.compressed()) - intensity_of_first_mask # so first intensity will actually be intensity of everything outside mask
-    print(intensity)
-    print("sum masked compressed:", np.sum(masked.compressed()))
     res = IntensityResults()
     area = np.sum(mask) - initial_area
-    print("initial area:%d , area: %d" %(initial_area, area))
+    print("initial area:%d , area: %d, sum mask: %d" %(initial_area, area, np.sum(mask)))
     res.areas.append(area)
     for i in range(iterations_needed):
+        print("sum mask: %d, area: %d " % (np.sum(mask), area))
         # intensity in region is total intensity including region - total instensity excluding region
         res.region_intensities.append(intensity)
-        print("intensity etc, ", intensity, np.sum(masked))
         intensity = np.sum(masked.compressed())
-        print("intensity reassigned %d" % intensity)
+        area = np.sum(mask)
         mask = binary_dilation(mask, iterations=pixels_per_iteration)
         masked = np.ma.masked_array(image_arr,mask=~mask)
-        intensity = np.sum(masked.compressed()) - intensity
-        print("after operation, intensity etc, ", intensity, np.sum(masked))
-        res.areas.append(np.sum(mask)-area)    
-        area = np.sum(mask)
-        print("finished iteration %d" %i)
+        intensity = np.sum(masked.compressed()) - intensity   
+        area = np.sum(mask) - area
+        res.areas.append(area) 
+        print("np.sum(mask)-area: %d, area %d" % (np.sum(mask)-area, area))
     print(res.areas)
     print(res.region_intensities)
     return res
