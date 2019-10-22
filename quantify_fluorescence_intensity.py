@@ -57,24 +57,18 @@ class IntensityResults(object):
 def compare_intensities(image_arr, injection_site, iteration_length, iterations_needed):
     injection_site_coords = injection_site.coords
     mask = np.zeros_like(image_arr)
-    print(mask.shape)
-    print(np.sum(mask))
-    print(np.sum(~mask))
     for x, y in injection_site_coords:
         mask[x,y] = 1
-    print(mask.shape)
-    print(np.sum(mask))
-    print(np.sum(~mask))
-    print("sum masked and not masked: ", np.sum(mask) + np.sum(~mask))
     initial_area = np.sum(mask)
+    print(initial_area)
     # problem is that first intensity is entire image- initial mask, need 
     pixels_per_iteration = iteration_length*7 # 7 pixels per micro meter
-    masked = np.ma.masked_array(image_arr,mask=~mask)
+    masked = np.ma.masked_array(image_arr,mask=~np.array(mask, dtype=bool))
     intensity_of_first_mask = np.sum(masked.compressed())
+    print("intensity_of_first_mask: ", np.sum(masked.compressed()))
     mask = binary_dilation(mask, iterations=pixels_per_iteration)
     print(mask.shape)
     print(np.sum(mask))
-    print(np.sum(~mask))
     print("sum masked and not masked: ", np.sum(mask) + np.sum(~mask))
     masked = np.ma.masked_array(image_arr,mask=~mask)
     # smallest distance outwards
@@ -82,7 +76,7 @@ def compare_intensities(image_arr, injection_site, iteration_length, iterations_
     intensity = np.sum(masked.compressed()) - intensity_of_first_mask # so first intensity will actually be intensity of everything outside mask
     #print("intenstiy %d first mask %d" % (intensity, intensity_of_first_mask))
     print(intensity)
-    print(np.sum(masked.compressed()))
+    print("sum masked compressed:", np.sum(masked.compressed()))
     res = IntensityResults()
     print(initial_area, masked.sum())
     area = np.sum(mask) - initial_area
@@ -91,15 +85,11 @@ def compare_intensities(image_arr, injection_site, iteration_length, iterations_
     for i in range(iterations_needed):
         # intensity in region is total intensity including region - total instensity excluding region
         res.region_intensities.append(intensity)
-        print(intensity, np.sum(masked))
+        print("intensity etc, ", intensity, np.sum(masked))
         mask = binary_dilation(mask, iterations=pixels_per_iteration)
-        print(mask.shape)
-        print(np.sum(mask))
-        print(np.sum(~mask))
-        print("sum masked and not masked: ", np.sum(mask) + np.sum(~mask))
         masked = np.ma.masked_array(image_arr,mask=~mask)
         intensity = np.sum(masked) - intensity
-        print(intensity)
+        print("intensity: ", intensity)
         res.areas.append(np.sum(mask)-area)    
         area = np.sum(mask)
         print("finished iteration %d" %i)
