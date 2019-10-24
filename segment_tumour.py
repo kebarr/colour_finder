@@ -219,3 +219,33 @@ plt.show()
 contrast_increased = exposure.adjust_gamma(brain_image_arr, gain=10, gamma=4)
 plt.imshow(contrast_increased)
 plt.show()
+
+tumour_gaussian = gaussian(contrast_increased, sigma=20)
+plt.imshow(tumour_gaussian)
+plt.show()
+
+# try increasing contrast and blurring again
+contrast_increased2 = exposure.adjust_gamma(tumour_gaussian, gain=30, gamma=4)
+plt.imshow(contrast_increased2)
+plt.show()
+
+
+# try edge detection on this.... doesn't work yet again....
+#edges = feature.canny(color.rgb2gray(tumour_gaussian2), sigma=4)
+tumour_gs = color.rgb2gray(contrast_increased2)
+markers = np.zeros_like(color.rgb2gray(tumour_gs))
+markers[tumour_gs > 0.015] = 1
+
+from skimage.morphology import remove_small_holes
+labelled = measure.label(markers)
+def get_largest_connected_component(segmentation):
+    labels = measure.label(segmentation)
+    assert( labels.max() != 0 ) # assume at least 1 CC
+    largest_cc = labels == np.argmax(np.bincount(labels.flat)[1:])+1
+    return remove_small_holes(measure.label(largest_cc), 500000)
+
+largest_label = get_largest_connected_component(markers)
+props = measure.regionprops(largest_label)
+
+brightfield_brain = "U87-GO-17_4a_x4_BF.jpg"
+
