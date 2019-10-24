@@ -22,14 +22,8 @@ def get_injection_site_props(image_arr, pixel_thresh=80, thresh_object=500, thre
     markers = np.zeros_like(image_arr)
     markers[image_arr < pixel_thresh] = 1
     labels = measure.label(markers)
-    plt.imshow(labels)
-    plt.show()
     labels_filtered = skimage.morphology.remove_small_objects(labels, thresh_object)
-    plt.imshow(labels_filtered)
-    plt.show()
     labels_final = measure.label(skimage.morphology.remove_small_holes(labels_filtered, thresh_hole))
-    plt.imshow(labels_final)
-    plt.show()
     props = measure.regionprops(labels_final, image_arr)
     # exclude label for entirey of image
     entire_area = image_arr.shape[0]*image_arr.shape[1]
@@ -54,7 +48,7 @@ class IntensityResults(object):
 
 
     def average_intensity_per_region(self):
-        return [int(i)/int(a) for i,a in zip(self.region_intensities, self.areas)]
+        return [int(i)/int(a) for i,a in zip(self.region_intensities, self.areas_with_previous_subtracted)]
 
 
 def compare_intensities(image_arr, injection_site, iteration_length, iterations_needed):
@@ -72,23 +66,22 @@ def compare_intensities(image_arr, injection_site, iteration_length, iterations_
     masked = np.ma.masked_array(image_arr,mask=~mask)
     intensity = np.sum(masked.compressed()) - intensity_of_first_mask # so first intensity will actually be intensity of everything outside mask
     res = IntensityResults()
-    area = np.sum(mask) - initial_area
-    print("initial area:%d , area: %d, sum mask: %d" %(initial_area, area, np.sum(mask)))
-    res.areas.append(area)
     for i in range(iterations_needed):
-        print("sum mask: %d, area: %d " % (np.sum(mask), area))
         # intensity in region is total intensity including region - total instensity excluding region
         res.region_intensities.append(intensity)
         intensity = np.sum(masked.compressed())
+        res.intensities_in_masks.append(intensity)
+        res.areas_full.append(np.sum(mask))
         area = np.sum(mask)
         print("area: ", area)
         mask = binary_dilation(mask, iterations=pixels_per_iteration)
         masked = np.ma.masked_array(image_arr,mask=~mask)
         intensity = np.sum(masked.compressed()) - intensity   
         area = np.sum(mask) - area
-        res.areas.append(area) 
+        res.areas_with_previous_subtracted.append(area) 
         print("np.sum(mask)-area: %d, area %d" % (np.sum(mask)-area, area))
-    print(res.areas)
+        print("finished iteration %d" % (i))
+    print(res.areas_with_previous_subtracted)
     print(res.region_intensities)
     return res
 
