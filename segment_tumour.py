@@ -4,14 +4,14 @@ from PIL import Image
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-from skimage.filters import sobel
-from skimage.morphology import watershed
+from skimage.filters import gaussian, median
 from skimage import measure
+from skimage import exposure
 from scipy.ndimage import median_filter
 from skimage.color import label2rgb
 import os
 import skimage
-
+from skimage.morphology import skeletonize
 
 def open_image(filename):
     img = Image.open(filename)
@@ -161,7 +161,7 @@ p = path.Path(props[1].coords)
 #from skimage.morphology import thin
 
 
-def locate_tumour_edge(filename, marker_thresh):
+def locate_tumour_edge_not_working(filename, marker_thresh):
     tumour_image_arr = open_image(filename)
     tumour_gs = color.rgb2gray(tumour_image_arr)
     green_tumour = np.zeros_like(tumour_gs)
@@ -212,9 +212,9 @@ result_1 = unsharp_mask(brain_image_arr, radius=30, amount=2)
 
 # try just increasing contrast
 
-contrast_increased = exposure.adjust_log(brain_image_arr, gain=1.5)
-plt.imshow(contrast_increased)
-plt.show()
+#contrast_increased = exposure.adjust_log(brain_image_arr, gain=1.5)
+#plt.imshow(contrast_increased)
+#plt.show()
 
 contrast_increased = exposure.adjust_gamma(brain_image_arr, gain=10, gamma=4)
 plt.imshow(contrast_increased)
@@ -248,4 +248,56 @@ largest_label = get_largest_connected_component(markers)
 props = measure.regionprops(largest_label)
 
 brightfield_brain = "U87-GO-17_4a_x4_BF.jpg"
+brain_image_arr = open_image(image_folder + U87_GO_17_4a + brightfield_brain)
 
+# to isolate tumour- can do inverse mask
+# try alpha composite to demonstrate what i've found.....
+#tumour_image = tumour_image.convert("RGB").putalpha(1)
+#tumour_image = Image.fromarray(~largest_label)
+#brain_brightfield = Image.open(image_folder + U87_GO_17_4a + brightfield_brain).convert("L")
+#brain_brightfield.putalpha(Image.fromarray(~largest_label).convert("L"))
+#alpha_composited = Image.alpha_composite(tumour_image, brain_brightfield)
+
+# alpha being annoying.... just try with mask
+brightfield_brain = "U87-GO-17_4a_x4_BF.jpg"
+brain_brightfield = Image.open(image_folder + U87_GO_17_4a + brightfield_brain).convert("L")
+from skimage.filters import median
+median_filtered = median(np.array(brain_brightfield))
+masked = np.ma.masked_array(np.array(brain_brightfield)[:2300, :3560], mask = ~largest_label)
+# not what i want to be doing.... threshold to get go, then median filter
+
+bb_arr = np.array(brain_brightfield)[:2300, :3560]
+thresholded = np.zeros_like(bb_arr)
+for i in range(len(bb_arr)):
+    for j in range(len(bb_arr[i])):
+            if bb_arr[i, j] < 100:
+                thresholded[i, j] = bb_arr[i, j]
+
+med_thresholded = median(thresholded)
+masked = np.ma.masked_array(thresholded, mask = ~largest_label)
+
+bb_arr_rgb = np.array(Image.open(image_folder + U87_GO_17_4a + brightfield_brain))
+for i in range(len(masked)):
+    for j in range(len(masked[i])):
+        if masked[i, j] != 0:
+            bb_arr_rgb[i,j] = np.array([255-masked[i,j],0,0])
+
+
+def locate_tumour(image_filename, marker_threshold= 0.15):
+    brain_image_arr = open_image(image_filename)
+    contrast_increased = exposure.adjust_gamma(brain_image_arr, gain=10, gamma=4)
+    tumour_gaussian = gaussian(contrast_increased, sigma=20)
+    # increase contrast and blurring again
+    contrast_increased2 = exposure.adjust_gamma(tumour_gaussian, gain=30, gamma=4)
+    # try edge detection on this.... doesn't work yet again....
+    tumour_gs = color.rgb2gray(contrast_increased2)
+    plt.imshow(tumour_gs)
+    plt.show()
+    markers = np.zeros_like(color.rgb2gray(tumour_gs))
+    markers[tumour_gs > marker_threshold] = 1
+    plt.imshow(markers)
+    plt.show()
+    largest_label = get_largest_connected_component(markers)
+    return largest_label
+
+tumour = locate_tumour(image_folder + U87_GO_17_4a + whole_brain_image, 0.1)

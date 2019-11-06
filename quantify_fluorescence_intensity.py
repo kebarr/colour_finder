@@ -1,16 +1,14 @@
-from scipy.ndimage.morphology import binary_dilation
 import numpy as np
+from scipy.ndimage.morphology import binary_dilation
 from PIL import Image
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-from skimage.filters import sobel
-from skimage.morphology import watershed
 from skimage import measure
 from scipy.ndimage import median_filter
 from skimage.color import label2rgb
 import os
-import skimage
+from skimage import morphology
 
 
 def open_image(filename):
@@ -21,9 +19,16 @@ def open_image(filename):
 def get_injection_site_props(image_arr, pixel_thresh=80, thresh_object=500, thresh_hole=5000):
     markers = np.zeros_like(image_arr)
     markers[image_arr < pixel_thresh] = 1
+    print("made markers")
+    plt.imshow(markers)
+    plt.savefig("markers.png")
     labels = measure.label(markers)
-    labels_filtered = skimage.morphology.remove_small_objects(labels, thresh_object)
-    labels_final = measure.label(skimage.morphology.remove_small_holes(labels_filtered, thresh_hole))
+    labels_filtered = morphology.remove_small_objects(labels, thresh_object)
+    plt.imshow(labels_filtered)
+    plt.savefig("labels_filtered.png")
+    labels_final = measure.label(morphology.remove_small_holes(labels_filtered, thresh_hole))
+    plt.imshow(labels_final)
+    plt.savefig("labels_final.png")
     props = measure.regionprops(labels_final, image_arr)
     # exclude label for entirey of image
     entire_area = image_arr.shape[0]*image_arr.shape[1]
@@ -73,14 +78,13 @@ def compare_intensities(image_arr, injection_site, iteration_length, iterations_
         res.intensities_in_masks.append(intensity)
         res.areas_full.append(np.sum(mask))
         area = np.sum(mask)
-        print("area: ", area)
         mask = binary_dilation(mask, iterations=pixels_per_iteration)
         masked = np.ma.masked_array(image_arr,mask=~mask)
         intensity = np.sum(masked.compressed()) - intensity   
         area = np.sum(mask) - area
-        res.areas_with_previous_subtracted.append(area) 
-        print("np.sum(mask)-area: %d, area %d" % (np.sum(mask)-area, area))
-        print("finished iteration %d" % (i))
+        res.areas_with_previous_subtracted.append(area)
+        if i%20 == 0: 
+            print("finished iteration %d" % (i))
     print(res.areas_with_previous_subtracted)
     print(res.region_intensities)
     return res
@@ -93,4 +97,33 @@ intensities = compare_intensities(image_arr, injection_site,1, "matt/MAX_Iba1_ma
 final = intensities.average_intensity_per_region()
 
 
+
+def compare_intensities(image_arr, mask, iteration_length, iterations_needed):
+    initial_area = np.sum(mask)
+    print(initial_area)
+    # problem is that first intensity is entire image- initial mask, need 
+    pixels_per_iteration = iteration_length*7 # 7 pixels per micro meter
+    masked = np.ma.masked_array(image_arr,mask=~np.array(mask, dtype=bool))
+    intensity_of_first_mask = np.sum(masked.compressed())
+    mask = binary_dilation(mask, iterations=pixels_per_iteration)
+    masked = np.ma.masked_array(image_arr,mask=~mask)
+    intensity = np.sum(masked.compressed()) - intensity_of_first_mask # so first intensity will actually be intensity of everything outside mask
+    res = IntensityResults()
+    for i in range(iterations_needed):
+        # intensity in region is total intensity including region - total instensity excluding region
+        res.region_intensities.append(intensity)
+        intensity = np.sum(masked.compressed())
+        res.intensities_in_masks.append(intensity)
+        res.areas_full.append(np.sum(mask))
+        area = np.sum(mask)
+        mask = binary_dilation(mask, iterations=pixels_per_iteration)
+        masked = np.ma.masked_array(image_arr,mask=~mask)
+        intensity = np.sum(masked.compressed()) - intensity   
+        area = np.sum(mask) - area
+        res.areas_with_previous_subtracted.append(area)
+        if i%20 == 0: 
+            print("finished iteration %d" % (i))
+    print(res.areas_with_previous_subtracted)
+    print(res.region_intensities)
+    return res
 

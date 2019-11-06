@@ -12,6 +12,7 @@ from skimage.color import label2rgb
 import os
 from skimage import morphology
 from skimage import exposure
+from skimage import filters
 
 # does make a difference....
 def count_cells_simple(props):
@@ -28,7 +29,10 @@ def count_cells_simple(props):
 
     
 def get_labelled_array(image_arr, gamma, binary_threshold):
-    gamma_corrected = exposure.adjust_gamma(image_arr, gamma)
+    gamma_corrected = exposure.adjust_gamma(image_arr, gamma)*255
+    #print("gamma corrected")
+    #plt.imshow(gamma_corrected)
+    #plt.show()
     binary = np.zeros_like(gamma_corrected)
     binary = gamma_corrected > binary_threshold
     labels = measure.label(binary)
@@ -41,19 +45,26 @@ def overlaps_region(prop, labels):
     return set() 
 
 
-def count_cells_neun(filename):
+def count_cells_neun(filename, outfile_name, gamma_low=8, gamma_high=100, contrast_thresh_low=50, contrast_thresh_high=200):
     img = Image.open(filename).convert("L")
     img.load()
     image_arr = np.array(img)
-    labels_low_contrast = get_labelled_array(image_arr, 8, 50)
-    plt.imshow(labels_low_contrast)
-    plt.show()
-    labels_high_contrast = get_labelled_array(image_arr, 100, 200)
+    image_arr = filters.gaussian(image_arr, sigma=3)
+    #plt.imshow(image_arr)
+    #plt.show()
+    labels_low_contrast = get_labelled_array(image_arr, gamma_low, contrast_thresh_low)
+    np.max(labels_low_contrast)
+    #plt.imshow(labels_low_contrast)
+    #plt.show()
+    labels_high_contrast = get_labelled_array(image_arr, gamma_high, contrast_thresh_high)
+    np.max(labels_high_contrast)
+    #plt.imshow(labels_high_contrast)
+    #plt.show()
     props_low_contrast = measure.regionprops(labels_low_contrast, image_arr) 
     props_high_contrast = measure.regionprops(labels_high_contrast, image_arr)
     print(len(props_low_contrast))
-    props_low_contrast_filtered = [p for p in props_low_contrast if len(p.coords)<=25 and len(p.coords) >1]
-    props_high_contrast_filtered = [p for p in props_high_contrast if len(p.coords)<100 and len(p.coords) >1]
+    props_low_contrast_filtered = [p for p in props_low_contrast if len(p.coords)<=10000 and len(p.coords) >300]
+    props_high_contrast_filtered = [p for p in props_high_contrast if len(p.coords)<10000 and len(p.coords) >5000]
     print("low contrast filtered: ", len(props_low_contrast_filtered))
     print("high contrast filtered: ", len(props_high_contrast_filtered))
     show_cells_counted = np.zeros_like(image_arr)
@@ -64,7 +75,7 @@ def count_cells_neun(filename):
         for coord in prop.coords:
             show_cells_counted[coord[0], coord[1]] = 2
     plt.imshow(show_cells_counted)
-    plt.savefig("cells_counted.png")
+    plt.savefig(outfile_name)
     number_cells = count_cells_simple(props_low_contrast_filtered)
     print("%d cells found using naive method" % number_cells)
     print("found %d cells found in total %s"% (len(props_high_contrast_filtered)-1+number_cells, filename))
@@ -97,16 +108,16 @@ class IntensityResults(object):
 
 
 # base counting specific distances from hole on previous intensity counting one 
-def compare_intensities(image_arr, injection_site, iteration_length, out_filename):
+def compare_intensities(image_arr, injection_site, iteration_length, out_filename, iterations_needed=200):
     injection_site_coords = injection_site.coords
     mask = np.zeros_like(image_arr)
     for x, y in injection_site_coords:
         mask[x,y] = 1
     plt.imshow(mask)
-    plt.savefig(out_filename)
-    pixels_per_iteration = iteration_length*4 # assume that its 4 pixels per micro (?) meter
+    plt.show()
+    pixels_per_iteration = iteration_length*7 # assume that its 4 pixels per micro (?) meter
     # smallest distance outwards
-    iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/pixels_per_iteration)
+    #iterations_needed = int(np.min(np.array([np.abs(injection_site.bbox[0]- image_arr.shape[0]), np.abs(injection_site.bbox[1]- image_arr.shape[0]), np.abs(injection_site.bbox[2]- image_arr.shape[1]), np.abs(injection_site.bbox[3]- image_arr.shape[1])]))/pixels_per_iteration)
     intensity = np.sum(image_arr)# so first intensity will actually be intensity of everything outside mask
     res = IntensityResults()
     area = np.sum(mask)
@@ -117,10 +128,11 @@ def compare_intensities(image_arr, injection_site, iteration_length, out_filenam
         intensity = np.sum(masked)
         res.sums.append(intensity)
         mask = binary_dilation(mask, iterations=pixels_per_iteration)
-        plt.imshow(mask)
-        plt.show()
+        #plt.imshow(mask)
+        #plt.show()
         res.areas.append(np.sum(mask)-area)
         area = np.sum(mask)
+        print("iteration: %d" % i)
     return res
 
 cell_props = count_cells_neun("matt/matt_neun_smaller.png") 
