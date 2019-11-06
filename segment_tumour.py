@@ -307,9 +307,9 @@ tumour_graphene = tumour.astype(int)*thresholded
 tumour_graphene_bin = np.zeros_like(tumour_graphene)
 tumour_graphene_bin[tumour_graphene>0] = 1
 
-window = np.ones((200,200))
-from scipy.signal import fftconvolve
-from matplotlib import cm, colors
+window = np.ones((5,5))
+#from scipy.signal import fftconvolve
+#from matplotlib import cm, colors
 windowed_average = fftconvolve(tumour_graphene_bin, window)
 norm = colors.Normalize(vmin=np.min(windowed_average), vmax=np.max(windowed_average))
 m = cm.ScalarMappable(norm=norm, cmap=cm.hot)
@@ -322,10 +322,28 @@ for i in range(len(bb_arr_rgb)):
 
 
 # https://stackoverflow.com/questions/31877353/overlay-an-image-segmentation-with-numpy-and-matplotlib
-m = cm.ScalarMappable(norm=norm, cmap=cm.Greens)
+window = np.ones((5,5))
+windowed_average = fftconvolve(tumour_graphene_bin, window)
+norm = colors.Normalize(vmin=np.min(windowed_average), vmax=np.max(windowed_average))
+m = cm.ScalarMappable(norm=norm, cmap=cm.jet)
 average_colourmapped = m.to_rgba(windowed_average)
 plt.imshow(bb_arr_rgb)
 plt.imshow(average_colourmapped, alpha=0.5)
+plt.show()
+# then tumour outline and brain contour (half image)
+
+mask_3d = np.zeros_like(average_colourmapped)
+for i in range(len(tumour)):
+    for j in range(len(tumour[i])):
+        if tumour[i,j] == 1:
+            mask_3d[i,j] = average_colourmapped[i,j]
+
+
+plt.imshow(bb_arr_rgb[:, 1750:])
+plt.imshow(mask_3d[:, 1750:], alpha=0.5)
+plt.show()
+
+# no colour, outline of tumour
 
 # quantify area its travelled
 
