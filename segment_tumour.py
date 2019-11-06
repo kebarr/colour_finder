@@ -301,3 +301,40 @@ def locate_tumour(image_filename, marker_threshold= 0.15):
     return largest_label
 
 tumour = locate_tumour(image_folder + U87_GO_17_4a + whole_brain_image, 0.1)
+masked = np.ma.masked_array(thresholded, mask = ~largest_label)
+
+tumour_graphene = tumour.astype(int)*thresholded
+tumour_graphene_bin = np.zeros_like(tumour_graphene)
+tumour_graphene_bin[tumour_graphene>0] = 1
+
+window = np.ones((200,200))
+from scipy.signal import fftconvolve
+from matplotlib import cm, colors
+windowed_average = fftconvolve(tumour_graphene_bin, window)
+norm = colors.Normalize(vmin=np.min(windowed_average), vmax=np.max(windowed_average))
+m = cm.ScalarMappable(norm=norm, cmap=cm.hot)
+bb_arr_rgb = np.array(Image.open(image_folder + U87_GO_17_4a + brightfield_brain))
+for i in range(len(bb_arr_rgb)):
+    for j in range(len(bb_arr_rgb[i])):
+        if windowed_average[i, j] > 0.1:# really really slow like this....
+            converted = m.to_rgba(windowed_average[i,j])[:-1]
+            bb_arr_rgb[i,j] = [converted[0]*255,converted[1]*255,converted[2]*255]
+
+
+# https://stackoverflow.com/questions/31877353/overlay-an-image-segmentation-with-numpy-and-matplotlib
+m = cm.ScalarMappable(norm=norm, cmap=cm.Greens)
+average_colourmapped = m.to_rgba(windowed_average)
+plt.imshow(bb_arr_rgb)
+plt.imshow(average_colourmapped, alpha=0.5)
+
+# quantify area its travelled
+
+# code- very bright colour, for very dense graphene, much less bright colour for less dense
+# pixels of grey per unit area.
+# what distance does 50% travel?
+
+# for density, convolve with array of ones. can't convolve with masked array, so multiply by tumour
+
+# cut image in half, outline of brain in one colour, tumour outline in another colour
+# how many sections is GO present in? give rough estimate of volume GO has moved through
+
