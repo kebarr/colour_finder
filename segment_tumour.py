@@ -14,10 +14,7 @@ import skimage
 from skimage.morphology import skeletonize
 from skimage.morphology import remove_small_objects, remove_small_holes
 
-def open_image(filename):
-    img = Image.open(filename)
-    img.load()
-    return np.array(img)
+
 
 image_folder = "/Users/user/Documents/image_analysis/paul/processed_images/"
 U87_GO_17_4a = "U87-GO-17-4a/"
@@ -409,5 +406,113 @@ plt.colorbar(m, cax=cax)
 # how many sections is GO present in? give rough estimate of volume GO has moved through
 
 # increase contrasts in density map - make redder where there's more GO and add colour bar
+
+def open_image(filename):
+    img = Image.open(filename)
+    img.load()
+    return np.array(img)
+
+
+class SegmentBrainImage(object):
+    def __init__(self, brightfield_filename, dapi_filename):
+        self.brightfield_filename = brightfield_filename
+        self.dapi_filename = dapi_filename
+
+    def segment_brain(self):
+        brain_image_arr = open_image(self.brightfield_filename)
+        self.brain_brightfield = brain_image_arr
+        contrast_increased = color.rgb2gray(exposure.adjust_gamma(brain_image_arr, gain=50, gamma=8))
+        mask_brain = np.zeros_like(contrast_increased)
+        mask_brain[contrast_increased < 0.7] = 1
+        mask_brain = remove_small_holes(mask_brain.astype(int), 10000)
+        labelled_brain = measure.label(mask_brain)
+        labelled_brain = measure.label(remove_small_objects(labelled_brain, 20000))
+        self.brain = labelled_brain
+        brain_contour = measure.find_contours(labelled_brain, 0.5)
+        contour_image_brain = np.zeros_like(mask_brain)
+        for i in range(len(brain_contour)):
+            for j in range(len(brain_contour[i])):
+                contour_image_brain[int(brain_contour[i][j][0]), int(brain_contour[i][j][1])] = 1
+        contour_image_brain = binary_dilation(binary_dilation(binary_dilation(contour_image_brain)))
+        self.brain_contours = contour_image_brain
+
+    def locate_tumour(self, marker_threshold= 0.15):
+        brain_image_arr = open_image(self.dapi_filename)
+        contrast_increased = exposure.adjust_gamma(brain_image_arr, gain=10, gamma=4)
+        tumour_gaussian = gaussian(contrast_increased, sigma=20)
+        # increase contrast and blurring again
+        contrast_increased2 = exposure.adjust_gamma(tumour_gaussian, gain=30, gamma=4)
+        tumour_gs = color.rgb2gray(contrast_increased2)
+        markers = np.zeros_like(tumour_gs)
+        markers[tumour_gs > marker_threshold] = 1
+        largest_label = get_largest_connected_component(markers)
+        return largest_label
+
+
+    def segment_tumour(self):
+        bb_arr = np.array(color.rgb2gray(self.brain_brightfield))
+        thresholded = np.zeros_like(bb_arr)
+        for i in range(len(bb_arr)):
+            for j in range(len(bb_arr[i])):
+                    if bb_arr[i, j] < 100:
+                        thresholded[i, j] = bb_arr[i, j]
+        tumour = self.locate_tumour(0.1)
+        tumour_graphene = tumour.astype(int)*thresholded[:len(tumour), :len(tumour[0])]
+        tumour_graphene_bin = np.zeros_like(tumour_graphene)
+        tumour_graphene_bin[tumour_graphene>0] = 1
+        self.tumour = tumour_graphene_bin
+        tumour_contour = measure.find_contours(tumour, 0.5)
+        contour_image = np.zeros((mask_3d.shape[0],mask_3d.shape[1]))
+        for i in range(len(tumour_contour[0])):
+            contour_image[int(tumour_contour[0][i][0]), int(tumour_contour[0][i][1])] = 1
+        contour_image = binary_dilation(binary_dilation(binary_dilation(contour_image)))
+        self.tumour_contours = contour_image
+
+    def calculate_graphene_density(self, window_size):
+        window = np.ones((window_size,window_size))
+        windowed_average = fftconvolve(tumour_graphene_bin, window)
+        self.densities = windowed_average
+        norm = colors.Normalize(0, vmax=np.max(windowed_average)-60, clip=True)
+        m = cm.ScalarMappable(norm=norm, cmap=cm.jet)
+        average_colourmapped = m.to_rgba(windowed_average)
+        self.average_colourmapped = average_colourmapped
+        self.mappable = m
+
+    def make_contour_images(self):
+        mask_3d = np.zeros_like(self.average_colourmapped)
+        for i in range(len(self.tumour_contours)):
+            for j in range(len(self.tumour_contours[i])):
+                if self.tumour_contours[i, j] == 1:
+                    mask_3d[i,j] = np.array([0, 255,0,1])
+                if self.brain_contours[i,j] == 1:
+                    mask_3d[i,j] = np.array([255,0,0,1])
+        return mask_3d
+
+    def present_results(self, outfile_name):
+        mask_3d = self.make_contour_images()
+        average_colourmapped = self.average_colourmapped
+        for i in range(len(tumour)):
+            for j in range(len(tumour[i])):
+                if tumour[i,j] == 1:
+                    if average_colourmapped[i,j, 0] == 0 and average_colourmapped[i,j, 1] == 0 and average_colourmapped[i,j, 2] == 0.5 and average_colourmapped[i,j, 3] == 1:
+                        pass
+                    else:
+                        mask_3d[i,j] = average_colourmapped[i,j]
+        plt.figure()
+        ax = plt.gca()
+        im = ax.imshow(mask_3d)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(self.mappable, cax=cax)
+        plt.savefig(outfile_name)
+
+
+brightfield_image = image_folder + U87_GO_17_4a + brightfield_brain
+dapi_image = image_folder + U87_GO_17_4a + whole_brain_image
+sbi = SegmentBrainImage(brightfield_image, dapi_image)
+sbi.segment_brain()
+sbi.segment_tumour()
+sbi.calculate_graphene_density(10)
+sbi.present_results("test.png")
 
 
