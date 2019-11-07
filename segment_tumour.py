@@ -12,6 +12,7 @@ from skimage.color import label2rgb
 import os
 import skimage
 from skimage.morphology import skeletonize
+from skimage.morphology import remove_small_objects, remove_small_holes
 
 def open_image(filename):
     img = Image.open(filename)
@@ -161,7 +162,7 @@ p = path.Path(props[1].coords)
 #from skimage.morphology import thin
 
 
-def locate_tumour_edge_not_working(filename, marker_thresh):
+def locate_tumour_edge_not_working(filename, marker_thresh=1):
     tumour_image_arr = open_image(filename)
     tumour_gs = color.rgb2gray(tumour_image_arr)
     green_tumour = np.zeros_like(tumour_gs)
@@ -194,7 +195,7 @@ def locate_tumour_edge_not_working(filename, marker_thresh):
     return labelled_final
 
 
-tumour_boundary = locate_tumour_edge(image_folder + U87_GO_17_4a + tumour_image)
+tumour_boundary = locate_tumour_edge_not_working(image_folder + U87_GO_17_4a + tumour_image)
 props = measure.regionprops(labelled_final)
 p = path.Path(props[1].coords)
 
@@ -202,7 +203,7 @@ p = path.Path(props[1].coords)
 # now need to try for whole brain image...
 whole_brain_image = "U87-GO-17_4a_x4_all.jpg"
 # finds the left brain ventricle
-tumour_boundary = locate_tumour_edge(image_folder + U87_GO_17_4a + whole_brain_image, 0.013)
+brain_boundary = locate_tumour_edge_not_working(image_folder + U87_GO_17_4a + whole_brain_image, 0.013)
 
 
 brain_image_arr = open_image(image_folder + U87_GO_17_4a + whole_brain_image)
@@ -249,6 +250,23 @@ props = measure.regionprops(largest_label)
 
 brightfield_brain = "U87-GO-17_4a_x4_BF.jpg"
 brain_image_arr = open_image(image_folder + U87_GO_17_4a + brightfield_brain)
+# now try getting outline of brain
+contrast_increased = color.rgb2gray(exposure.adjust_gamma(brain_image_arr, gain=50, gamma=8))
+plt.imshow(contrast_increased)
+plt.show()
+mask_brain = np.zeros_like(contrast_increased)
+mask_brain[contrast_increased < 0.7] = 1
+mask_brain = remove_small_holes(mask_brain.astype(int), 10000)
+labelled_brain = measure.label(mask_brain)
+labelled_brain = measure.label(remove_small_objects(labelled_brain, 20000))
+brain_contour = measure.find_contours(labelled_brain, 0.5)
+
+contour_image_brain = np.zeros_like(mask_brain)
+for i in range(len(brain_contour)):
+    for j in range(len(brain_contour[i])):
+        contour_image_brain[int(brain_contour[i][j][0]), int(brain_contour[i][j][1])] = 1
+
+contour_image_brain = binary_dilation(binary_dilation(binary_dilation(contour_image_brain)))
 
 # to isolate tumour- can do inverse mask
 # try alpha composite to demonstrate what i've found.....
@@ -336,8 +354,23 @@ mask_3d = np.zeros_like(average_colourmapped)
 for i in range(len(tumour)):
     for j in range(len(tumour[i])):
         if tumour[i,j] == 1:
-            mask_3d[i,j] = average_colourmapped[i,j]
+            if average_colourmapped[i,j, 0] == 0 and average_colourmapped[i,j, 1] == 0 and average_colourmapped[i,j, 2] == 0.5 and average_colourmapped[i,j, 3] == 1:
+                pass
+            else:
+                mask_3d[i,j] = average_colourmapped[i,j]
 
+tumour_contour = measure.find_contours(tumour, 0.5)
+
+contour_image = np.zeros_like(mask_3d)
+for i in range(len(tumour_contour[0])):
+    contour_image[int(tumour_contour[0][i][0]), int(tumour_contour[0][i][1])] = np.array([0.5,0.5,0.5,1])
+
+contour_image = binary_dilation(binary_dilation(binary_dilation(contour_image))))
+
+for i in range(len(contour_image)):
+    for j in range(len(contour_image[i])):
+        if np.sum(contour_image[i, j]) !=0:
+            mask_3d[i,j] = contour_image[i,j]
 
 plt.imshow(bb_arr_rgb[:, 1750:])
 plt.imshow(mask_3d[:, 1750:], alpha=0.5)
