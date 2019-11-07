@@ -342,8 +342,8 @@ for i in range(len(bb_arr_rgb)):
 # https://stackoverflow.com/questions/31877353/overlay-an-image-segmentation-with-numpy-and-matplotlib
 window = np.ones((10,10))
 windowed_average = fftconvolve(tumour_graphene_bin, window)
-norm = colors.Normalize(vmin=np.min(windowed_average), vmax=np.max(windowed_average))
-m = cm.ScalarMappable(norm=norm, cmap=cm.plasma)
+norm = colors.Normalize(-20, vmax=np.max(windowed_average))
+m = cm.ScalarMappable(norm=norm, cmap=cm.jet)
 average_colourmapped = m.to_rgba(windowed_average)
 #plt.imshow(bb_arr_rgb)
 #plt.imshow(average_colourmapped, alpha=0.5)
@@ -354,7 +354,7 @@ mask_3d = np.zeros_like(average_colourmapped)
 for i in range(len(tumour)):
     for j in range(len(tumour[i])):
         if tumour[i,j] == 1:
-            if average_colourmapped[i,j, 2] > 0.525 and average_colourmapped[i,j, 2] < 0.53:
+            if average_colourmapped[i,j, 0] == 0 and average_colourmapped[i,j, 1] > 0.17 and average_colourmapped[i,j, 1] < 0.24 and average_colourmapped[i,j, 2] == 1:
                 #print("yes")
                 pass
             else:
