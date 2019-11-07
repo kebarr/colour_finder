@@ -340,21 +340,22 @@ for i in range(len(bb_arr_rgb)):
 
 
 # https://stackoverflow.com/questions/31877353/overlay-an-image-segmentation-with-numpy-and-matplotlib
-window = np.ones((5,5))
+window = np.ones((10,10))
 windowed_average = fftconvolve(tumour_graphene_bin, window)
 norm = colors.Normalize(vmin=np.min(windowed_average), vmax=np.max(windowed_average))
-m = cm.ScalarMappable(norm=norm, cmap=cm.jet)
+m = cm.ScalarMappable(norm=norm, cmap=cm.plasma)
 average_colourmapped = m.to_rgba(windowed_average)
-plt.imshow(bb_arr_rgb)
-plt.imshow(average_colourmapped, alpha=0.5)
-plt.show()
+#plt.imshow(bb_arr_rgb)
+#plt.imshow(average_colourmapped, alpha=0.5)
+#plt.show()
 # then tumour outline and brain contour (half image)
 
 mask_3d = np.zeros_like(average_colourmapped)
 for i in range(len(tumour)):
     for j in range(len(tumour[i])):
         if tumour[i,j] == 1:
-            if average_colourmapped[i,j, 0] == 0 and average_colourmapped[i,j, 1] == 0 and average_colourmapped[i,j, 2] == 0.5 and average_colourmapped[i,j, 3] == 1:
+            if average_colourmapped[i,j, 2] > 0.525 and average_colourmapped[i,j, 2] < 0.53:
+                #print("yes")
                 pass
             else:
                 mask_3d[i,j] = average_colourmapped[i,j]
@@ -375,9 +376,9 @@ for i in range(len(contour_image)):
             mask_3d[i,j] = np.array([255,0,0,1])
 
 
-plt.imshow(bb_arr_rgb[:, 1750:])
-plt.imshow(mask_3d[:, 1750:], alpha=0.5)
-plt.show()
+#plt.imshow(bb_arr_rgb[:, 1750:])
+#plt.imshow(mask_3d[:, 1750:], alpha=0.5)
+#plt.show()
 
 # want bar and image to be same size: https://stackoverflow.com/questions/18195758/set-matplotlib-colorbar-size-to-match-graph
 plt.figure()
@@ -392,6 +393,8 @@ cax = divider.append_axes("right", size="5%", pad=0.05)
 
 plt.colorbar(m, cax=cax)
 
+# need to try nonlinear colourbar
+# https://stackoverflow.com/questions/22521382/nonlinear-colormap-matplotlib
 
 
 # quantify area its travelled
