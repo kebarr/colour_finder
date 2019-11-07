@@ -361,22 +361,38 @@ for i in range(len(tumour)):
 
 tumour_contour = measure.find_contours(tumour, 0.5)
 
-contour_image = np.zeros_like(mask_3d)
+contour_image = np.zeros((mask_3d.shape[0],mask_3d.shape[1]))
 for i in range(len(tumour_contour[0])):
-    contour_image[int(tumour_contour[0][i][0]), int(tumour_contour[0][i][1])] = np.array([0.5,0.5,0.5,1])
+    contour_image[int(tumour_contour[0][i][0]), int(tumour_contour[0][i][1])] = 1
 
-contour_image = binary_dilation(binary_dilation(binary_dilation(contour_image))))
+contour_image = binary_dilation(binary_dilation(binary_dilation(contour_image)))
 
 for i in range(len(contour_image)):
     for j in range(len(contour_image[i])):
-        if np.sum(contour_image[i, j]) !=0:
-            mask_3d[i,j] = contour_image[i,j]
+        if contour_image[i, j] == 1:
+            mask_3d[i,j] = np.array([0, 255,0,1])
+        if contour_image_brain[i,j] == 1:
+            mask_3d[i,j] = np.array([255,0,0,1])
+
 
 plt.imshow(bb_arr_rgb[:, 1750:])
 plt.imshow(mask_3d[:, 1750:], alpha=0.5)
 plt.show()
 
-# no colour, outline of tumour
+# want bar and image to be same size: https://stackoverflow.com/questions/18195758/set-matplotlib-colorbar-size-to-match-graph
+plt.figure()
+ax = plt.gca()
+im = ax.imshow(mask_3d)
+
+# create an axes on the right side of ax. The width of cax will be 5%
+# of ax and the padding between cax and ax will be fixed at 0.05 inch.
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.05)
+
+plt.colorbar(m, cax=cax)
+
+
 
 # quantify area its travelled
 
@@ -388,4 +404,7 @@ plt.show()
 
 # cut image in half, outline of brain in one colour, tumour outline in another colour
 # how many sections is GO present in? give rough estimate of volume GO has moved through
+
+# increase contrasts in density map - make redder where there's more GO and add colour bar
+
 
