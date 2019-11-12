@@ -20,7 +20,7 @@ U87_GO_17_4a = "U87-GO-17-4a/"
 U87_GO_26_5a = "U87-GO-26-5a/"
 tumour_image_17_4a = "U87-GO-17_4a_x20_all.jpg"
 tumour_image_26_5a = "U87-GO-26_overlay.jpg"
-go_image = "U87-GO-17_4a_x20_BF.jpg"
+go_image = "U87-GO-17_4a_x4_BF.jpg"
 go_image_26_5a = "U87-GO-26_x4_BF.jpg"
 
 img_26_5a = open_image(image_folder+U87_GO_26_5a+go_image_26_5a)
@@ -168,6 +168,43 @@ from skimage.morphology import binary_dilation, remove_small_holes, remove_small
 
 filt_real, filt_imag = gabor(img_26_5a, frequency=0.7)
 labelled = binary_dilation(measure.label(filt_imag))
-filled = remove_small_holes(labelled, 500000)
-final = remove_small_objects(filled, 1000)
+filled = remove_small_holes(labelled, 1000000)
+final = remove_small_objects(filled, 10000)
 #https://scikit-image.org/docs/dev/auto_examples/features_detection/plot_gabor.html#sphx-glr-auto-examples-features-detection-plot-gabor-py
+
+# doesn't work for this one....
+filt_real, filt_imag = gabor(img_17_4a, frequency=0.7)
+labelled = binary_dilation(binary_dilation(measure.label(filt_imag)))
+filled = remove_small_holes(labelled, 1000000)
+final = remove_small_objects(filled, 10000)
+
+def open_image_gs(filename):
+    img = Image.open(filename).convert("L")
+    img.load()
+    return np.array(img)
+
+
+def segment_brain(image_filename, number_dilations=2):
+    image = open_image_gs(image_filename)
+    filt_real, filt_imag = gabor(image, frequency=0.7)
+    labelled = measure.label(filt_imag)
+    for i in range(number_dilations):
+        labelled = binary_dilation(labelled)
+    filled = remove_small_holes(labelled, 1000000)
+    final = remove_small_objects(filled, 10000)
+    return final
+
+U87_GO_19_3a = "U87-GO-19-3a/"
+U87_GO_19_3a_go = "U87-GO-19_3a_x4_BF.jpg"
+
+segmented_19_3a = segment_brain(image_folder+U87_GO_19_3a+U87_GO_19_3a_go)
+
+U87_GO_24_3a = "U87-GO-24-3a/"
+U87_GO_24_3a_go = "U87-GO-24_3a_x4_BF.jpg"
+segmented_24_3a = segment_brain(image_folder+U87_GO_24_3a+U87_GO_24_3a_go, 0)
+
+image = open_image_gs(image_folder+U87_GO_24_3a+U87_GO_24_3a_go)
+filt_real, filt_imag = gabor(image, frequency=0.7)
+labelled = binary_dilation(binary_dilation(measure.label(filt_imag)))
+filled = remove_small_holes(labelled, 1000000)
+final = remove_small_objects(filled, 10000)
