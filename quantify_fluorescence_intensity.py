@@ -21,14 +21,18 @@ def get_injection_site_props(image_arr, pixel_thresh=80, thresh_object=500, thre
     markers[image_arr < pixel_thresh] = 1
     print("made markers")
     plt.imshow(markers)
-    plt.savefig("markers.png")
+    plt.show()
+    plt.close()
     labels = measure.label(markers)
     labels_filtered = morphology.remove_small_objects(labels, thresh_object)
+    print(labels_filtered.shape)
     plt.imshow(labels_filtered)
-    plt.savefig("labels_filtered.png")
+    plt.show()
+    plt.close()
     labels_final = measure.label(morphology.remove_small_holes(labels_filtered, thresh_hole))
     plt.imshow(labels_final)
-    plt.savefig("labels_final.png")
+    plt.show()
+    plt.close()
     props = measure.regionprops(labels_final, image_arr)
     # exclude label for entirey of image
     entire_area = image_arr.shape[0]*image_arr.shape[1]
@@ -126,4 +130,6 @@ def compare_intensities(image_arr, mask, iteration_length, iterations_needed):
     print(res.areas_with_previous_subtracted)
     print(res.region_intensities)
     return res
+
+
 

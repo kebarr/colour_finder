@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from skimage.filters import gaussian, median
 from skimage import measure, exposure, color
 from scipy.ndimage import median_filter
+from scipy.signal import fftconvolve
 import os
 import skimage
 from skimage.morphology import remove_small_objects, remove_small_holes
@@ -39,53 +40,53 @@ class SegmentBrainImage(object):
         image_arr = self.brain_brightfield 
         contrast_increased = color.rgb2gray(exposure.adjust_gamma(image_arr, gain=gain, gamma=gamma))
         mask_brain = np.zeros_like(contrast_increased)
-        plt.imshow(contrast_increased)
-        plt.show()
+        #plt.imshow(contrast_increased)
+        #plt.show()
         if mask_gt_lt == "lt":
             mask_brain[contrast_increased < mask_thresh] = 1
         else:
             mask_brain[contrast_increased > mask_thresh] = 1
-        plt.imshow(mask_brain)
-        plt.show()
+        #plt.imshow(mask_brain)
+        #plt.show()
         mask_brain = remove_small_holes(mask_brain.astype(int), hole_size)
-        plt.imshow(mask_brain)
-        plt.show()
+        #plt.imshow(mask_brain)
+        #plt.show()
         labelled_brain = measure.label(mask_brain)
         labelled_brain = measure.label(remove_small_objects(labelled_brain, object_size))
-        plt.imshow(labelled_brain)
-        plt.show()
+        #plt.imshow(labelled_brain)
+        #plt.show()
         self.brain = get_largest_connected_component(labelled_brain)
         brain_contour = measure.find_contours(labelled_brain, 0.5)
         contour_image_brain = np.zeros_like(mask_brain)
         for i in range(len(brain_contour)):
             for j in range(len(brain_contour[i])):
                 contour_image_brain[int(brain_contour[i][j][0]), int(brain_contour[i][j][1])] = 1
-        contour_image_brain = binary_dilation(binary_dilation(binary_dilation(contour_image_brain)))
+        contour_image_brain = binary_dilation(binary_dilation(binary_dilation(binary_dilation(binary_dilation(contour_image_brain)))))
         self.brain_contours = contour_image_brain
 
     def locate_tumour(self, marker_threshold=0.15, gain1=10, gamma1=4, sigma=20, gain2=30, gamma2=4):
         brain_image_arr = self.brain_dapi
         contrast_increased = exposure.adjust_gamma(brain_image_arr, gain=gain1, gamma=gamma1)
-        plt.imshow(contrast_increased)
-        plt.show()
+        #plt.imshow(contrast_increased)
+        #plt.show()
         tumour_gaussian = gaussian(contrast_increased, sigma=sigma)
-        plt.imshow(tumour_gaussian)
-        plt.show()
+        #plt.imshow(tumour_gaussian)
+        #plt.show()
         # increase contrast and blurring again
         contrast_increased2 = exposure.adjust_gamma(tumour_gaussian, gain=30, gamma=4)
-        plt.imshow(contrast_increased2)
-        plt.show()
+        #plt.imshow(contrast_increased2)
+        #plt.show()
         tumour_gs = color.rgb2gray(contrast_increased2)
         print("tumour gs")
-        plt.imshow(tumour_gs)
-        plt.show()
+        #plt.imshow(tumour_gs)
+        #plt.show()
         markers = np.zeros_like(tumour_gs)
         markers[tumour_gs > marker_threshold] = 1
-        plt.imshow(markers)
-        plt.show()
+        #plt.imshow(markers)
+        #plt.show()
         largest_label = get_largest_connected_component(markers)
-        plt.imshow(largest_label)
-        plt.show()
+        #plt.imshow(largest_label)
+        #plt.show()
         return largest_label
 
 
@@ -102,8 +103,8 @@ class SegmentBrainImage(object):
         if len(tumour[0]) != len(thresholded[0]):
             x_dim = np.min([len(tumour[0]), len(thresholded[0])])
         print("thresholded")
-        plt.imshow(thresholded)
-        plt.show()
+        #plt.imshow(thresholded)
+        #plt.show()
         tumour_graphene = tumour[:y_dim, :x_dim].astype(int)*thresholded[:y_dim, :x_dim]
         tumour_graphene_bin = np.zeros_like(tumour_graphene)
         tumour_graphene_bin[tumour_graphene>0] = 1
@@ -118,7 +119,7 @@ class SegmentBrainImage(object):
 
     def calculate_graphene_density(self, window_size):
         window = np.ones((window_size,window_size))
-        windowed_average = fftconvolve(self.tumour, window)
+        windowed_average = fftconvolve(self.tumour_graphene_bin, window)
         self.densities = windowed_average
         norm = colors.Normalize(0, vmax=np.max(windowed_average)-60, clip=True)
         m = cm.ScalarMappable(norm=norm, cmap=cm.jet)
@@ -180,6 +181,9 @@ sbi.present_results("test.png")
 
 sbi = SegmentBrainImage(brightfield_image_26, dapi_image_26)
 sbi.segment_brain(70, "gt", 7, 8, 100000)
-sbi.segment_tumour()
+sbi.segment_tumour(graphene_threshold=120, sigma=30)
 sbi.calculate_graphene_density(10)
 sbi.present_results("26_res")
+
+
+
