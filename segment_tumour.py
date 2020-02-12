@@ -40,8 +40,8 @@ class SegmentBrainImage(object):
         image_arr = self.brain_brightfield 
         contrast_increased = color.rgb2gray(exposure.adjust_gamma(image_arr, gain=gain, gamma=gamma))
         mask_brain = np.zeros_like(contrast_increased)
-        #plt.imshow(contrast_increased)
-        #plt.show()
+        plt.imshow(contrast_increased)
+        plt.show()
         if mask_gt_lt == "lt":
             mask_brain[contrast_increased < mask_thresh] = 1
         else:
@@ -49,12 +49,12 @@ class SegmentBrainImage(object):
         #plt.imshow(mask_brain)
         #plt.show()
         mask_brain = remove_small_holes(mask_brain.astype(int), hole_size)
-        #plt.imshow(mask_brain)
-        #plt.show()
+        plt.imshow(mask_brain)
+        plt.show()
         labelled_brain = measure.label(mask_brain)
         labelled_brain = measure.label(remove_small_objects(labelled_brain, object_size))
-        #plt.imshow(labelled_brain)
-        #plt.show()
+        plt.imshow(labelled_brain)
+        plt.show()
         self.brain = get_largest_connected_component(labelled_brain)
         brain_contour = measure.find_contours(labelled_brain, 0.5)
         contour_image_brain = np.zeros_like(mask_brain)
@@ -167,8 +167,8 @@ tumour_image_26_5a = "U87-GO-26_overlay.jpg"
 go_image = "U87-GO-17_4a_x20_BF"
 go_image_26_5a = "U87-GO-26_x4_BF.jpg"
 
-brightfield_image = image_folder + U87_GO_17_4a + brightfield_brain
-dapi_image = image_folder + U87_GO_17_4a + whole_brain_image
+#brightfield_image = image_folder + U87_GO_17_4a + brightfield_brain
+#dapi_image = image_folder + U87_GO_17_4a + whole_brain_image
 
 brightfield_image_26 = image_folder + U87_GO_26_5a + go_image_26_5a
 dapi_image_26 = image_folder + U87_GO_26_5a +tumour_image_26_5a
