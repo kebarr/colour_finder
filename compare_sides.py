@@ -7,41 +7,46 @@ import matplotlib.pyplot as plt
 from skimage import measure
 import os
 from skimage import morphology
-
+from itertools import zip_longest
 
 
 
 # store all numbers for each animal together
 class Result:
-    def __init__(self):
-        self.total_intensities = []
-        self.inner_intensities = []
-        self.props = []
+    def __init__(self, metrics):
+        self.metrics = metrics
+        self.results = [[] for i in range(len(metrics))]
+        self.results_averaged = [0 for i in range(len(metrics))]
 
     def average(self):
-        self.total_averaged = np.mean(self.total_intensities)
-        self.inner_averaged = np.mean(self.inner_intensities)
-        self.prop_averaged = np.mean(self.props)
+        for i in range(len(self.metrics)):
+            self.results_averaged[i] = np.mean(self.results[i])
 
+
+def inner_intensity(data):
+    return np.sum(data[246:-246, 420:-420])
+
+
+def prop(data):
+    inner_intensity = np.sum(data[246:-246, 420:-420])
+    total_intensity = np.sum(data)
+    return float(inner_intensity)/float(total_intensity)
 
 class Animal:
-    def __init__(self, containing_folder, name):
+    def __init__(self, containing_folder, name, metrics):
         self.containing_folder = containing_folder
         self.name = name
         self.samples = [sample for sample in os.listdir(containing_folder) if name in sample]
-        self.result = Result()
+        self.result = Result(metrics)
 
     def analyse_image(self, filename):
         file_path = self.containing_folder + '/' + filename
         im = Image.open(file_path).convert('L')
         data = np.array(im, dtype=float)
         norm = preprocessing.normalize(im, norm='l2')
-        inner_intensity = np.sum(norm[246:-246, 420:-420])
-        total_intensity = np.sum(norm)
-        prop = float(inner_intensity)/float(total_intensity)
-        self.result.inner_intensities.append(inner_intensity)
-        self.result.total_intensities.append(total_intensity)
-        self.result.props.append(prop)
+        for metric in self.result.metrics:
+            res = metric.function(norm)
+            self.result.results[i].append(res)
         print('results for %s: inner intensity %d, total intensity %d, prop %f' % (filename, inner_intensity, total_intensity, prop))
 
     def analyse_images(self):
@@ -50,86 +55,14 @@ class Animal:
             self.analyse_image(sample)
         self.result.average()
 
-# helper class to store data from each side
-# want to store results for each, should include animal and sample number too
-class Side:
-    def __init__(self, folder, stains, conditions):
-        self.folder = folder
-        self.conditions = conditions
-
-    def get_filenames_and_create_animals(self):
-        animals = {stain:{condition:[] for condition in self.conditions} for stain in self.stains} 
-        # assumes that file system is of the form:
-        # folder/stain_name/condition
-        number_of_animals = 0
-        for stain in self.stains:
-            for condition in self.conditions:
-                folder_path = self.folder + '/' + stain + '/' + condition
-                files = os.listdir(folder_path)
-                animal_names = set([s.split(' ')[0] for s in files if s.endswith('.tif')])
-                number_of_animals += len(animal_names)
-                animals_in_this_condition = []
-                for animal_name in animal_names:
-                    animal = Animal(folder_path, animal_name)
-                    animals_in_this_condition.append(animal)
-                animals[stain][condition] = animals_in_this_condition
-        self.animals = animals
-
-    def run(self):
-        for stain in self.stains:
-            for condition in self.conditions:
-                for animal in self.animals[stain][condition]:
-                    animal.analyse_images()
-
-
-
-
-# need to compare contralateral side to probe site side to quantify differences
-
-class CompareSides:
-    def __init__(self, folder_side_one, folder_side_two, list_of_stain_names, list_of_conditions):
-        self.folder_side_one = folder_side_one
-        self.folder_side_two = folder_side_two
-        self.list_of_stain_names = list_of_stain_names
-        self.list_of_conditions = list_of_conditions
-        self.create_sides()
-
-    def create_sides(self):
-        self.side_one = Side(self.folder_side_one, self.list_of_stain_names, self.list_of_conditions)
-        self.side_two = Side(self.folder_side_one, self.list_of_stain_names, self.list_of_conditions)
-
-    def run(self):
-        print("running side one %s" % (self.folder_side_one))
-        self.side_one.run()
-        print("running side two %s" % (self.folder_side_two))
-        self.side_two.run()
-
-    def perform_comparison(self):
-        # compare the probe and contralateral sides of each sample
-        for stain in self.list_of_stain_names:
-            for condition in self.list_of_conditions:
-                # need to match each animal name and then each section
-                pass
-
-
-
-class ComparisonResult:
-    def __init__(self, name):
-        self.name = name
-        self.total_intensity_diffs = {}
-        self.inner_intensity_diffs = {}
-        self.prop_diffs = {}
-        self.average_total_intensity_diff = -1
-        self.average_inner_intensity_diff = -1
-        self.average_prop = -1
-
 
 
 class Stain:
-    def __init__(self, side_folders, name, conditions):
+    def __init__(self, side_folders, name, conditions, list_of_metrics):
         self.side_folders = side_folders
         self.name = name
         self.conditions = conditions
+        self.list_of_metrics = list_of_metrics
         print(side_folders)
         self.get_filenames_and_create_animals()
 
@@ -147,7 +80,7 @@ class Stain:
                     print(animals[condition].keys())
                     if animal_name not in animals[condition].keys():
                         animals[condition][animal_name] = {}
-                    animal = Animal(folder_path, animal_name)
+                    animal = Animal(folder_path, animal_name, self.list_of_metrics)
                     animals[condition][animal_name][folder] = animal
             print(animals)
         self.animals = animals
@@ -161,15 +94,32 @@ class Stain:
                     self.animals[condition][animal][animal_side].analyse_images()
 
 
+# makes sense to just have one metric object, which is reused for each animal 
+class Metric:
+    def __init__(self, name, function):
+        self.name = name
+        self.function = function
 
+    def write_output_string(self, header, data):
+        ''' convert data to string to write to results csv '''
+        res = list(map(list, zip_longest(*data)))
+        out_str = 'prop diffs:\n'
+        out_str += '2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n'
+        for i in range(len(res)):
+            for j in range(len(res[i])):
+                out_str += str(res[i][j])+', '
+            out_str += '\n'
+        out_str +='\n'
+        return out_str
 
 # try again but with stain helper class
 class CompareSides:
-    def __init__(self, folder_side_one, folder_side_two, list_of_stain_names, list_of_conditions):
+    def __init__(self, folder_side_one, folder_side_two, list_of_stain_names, list_of_conditions, list_of_metrics):
         self.folder_side_one = folder_side_one
         self.folder_side_two = folder_side_two
         self.list_of_stain_names = list_of_stain_names
         self.list_of_conditions = list_of_conditions
+        self.list_of_metrics = list_of_metrics
         self.create_stains()
 
     def create_stains(self):
@@ -201,7 +151,6 @@ class CompareSides:
                         animal_side2 = stain.animals[condition][animal][side2]
                         side1_samples = animal_side1.samples
                         side2_samples = animal_side2.samples
-                        res = ComparisonResult(animal)
                         for i, sample in enumerate(side1_samples):
                             if sample in side2_samples:
                                 print(sample)
@@ -245,36 +194,83 @@ class CompareSides:
                         res_inner_diffs[i].append(sample)
                     for sample in animal_res.total_intensity_diffs.values():
                         res_total_diffs[i].append(sample)
-                    print(res_prop_diffs)
                     res_prop_average_diffs[i].append(animal_res.average_prop)  
                     res_inner_average_diffs[i].append(animal_res.average_inner_intensity_diff)  
                     res_total_average_diffs[i].append(animal_res.average_total_intensity_diff)                
-            out_filename_prop_diffs = out_filename_base + '_' + stain + '_prop_diffs.csv'                
-            out_filename_inner_diffs = out_filename_base + '_' + stain + '_inner_diffs.csv'                
-            out_filename_total_diffs = out_filename_base + '_' + stain + '_total_diffs.csv'                
-            out_filename_prop_diffs_average = out_filename_base + '_' + stain + '_average_prop_diffs.csv'                
-            out_filename_inner_average_diffs = out_filename_base + '_' + stain + '_inner_average_prop_diffs.csv'                
-            out_filename_total_average_diffs = out_filename_base + '_' + stain + '_total_average_prop_diffs.csv'                
-            res_prop_diffs = list(map(list, zip(*res_prop_diffs)))
-            res_inner_diffs = list(map(list, zip(*res_inner_diffs)))
-            res_total_diffs = list(map(list, zip(*res_total_diffs)))
-            print(res_prop_average_diffs)
-            #res_prop_average_diffs = list(map(list, zip(*res_prop_average_diffs)))
-            #res_inner_average_diffs = list(map(list, zip(*res_inner_average_diffs)))
-            #res_total_average_diffs = list(map(list, zip(*res_total_average_diffs)))
+            out_filename = out_filename_base + '_' + stain + '.csv'           
+            print(res_prop_diffs)
+            print(len(res_prop_diffs))
+            print(len(res_prop_diffs[0]))
+            res_prop_diffs = list(map(list, zip_longest(*res_prop_diffs)))
+            res_inner_diffs = list(map(list, zip_longest(*res_inner_diffs)))
+            res_total_diffs = list(map(list, zip_longest(*res_total_diffs)))
+            res_prop_average_diffs = list(map(list, zip_longest(*res_prop_average_diffs)))
+            res_inner_average_diffs = list(map(list, zip_longest(*res_inner_average_diffs)))
+            res_total_average_diffs = list(map(list, zip_longest(*res_total_average_diffs)))
+            print(len(res_prop_diffs))
+            print(len(res_prop_diffs[0]))
             # need to output csv in format ready for estimation stats.
-            np.savetxt(out_filename_prop_diffs, np.array([np.array(xi) for xi in res_prop_diffs]), header='2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene')
-            np.savetxt(out_filename_inner_diffs, np.array([np.array(xi) for xi in res_inner_diffs]).transpose(), header='2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene')
-            np.savetxt(out_filename_total_diffs, np.array([np.array(xi) for xi in res_total_diffs]).transpose(), header='2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene')
-            np.savetxt(out_filename_prop_diffs_average, np.array([np.array(xi) for xi in res_prop_average_diffs]).transpose(), header='2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene')
-            np.savetxt(out_filename_inner_average_diffs, np.array([np.array(xi) for xi in res_inner_average_diffs]).transpose(), header='2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene')
-            np.savetxt(out_filename_total_average_diffs, np.array([np.array(xi) for xi in res_total_average_diffs]).transpose(), header='2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene')
+            with open(out_filename, 'w') as f:
+                print(res_prop_diffs)
+                f.write('prop diffs:\n')
+                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
+                for i in range(len(res_prop_diffs)):
+                    for j in range(len(res_prop_diffs[i])):
+                        f.write(str(res_prop_diffs[i][j])+', ')
+                    f.write('\n')
+                f.write('\n')
+                print(res_inner_diffs)
+                f.write('inner diffs:\n')
+                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
+                for i in range(len(res_inner_diffs)):
+                    for j in range(len(res_inner_diffs[i])):
+                        f.write(str(res_inner_diffs[i][j])+', ')
+                    f.write('\n')
+                f.write('\n')
+                print(res_total_diffs)
+                f.write('total diffs:\n')
+                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
+                for i in range(len(res_total_diffs)):
+                    for j in range(len(res_total_diffs[i])):
+                        f.write(str(res_total_diffs[i][j])+', ')
+                    f.write('\n')
+                f.write('\n')
+                print(res_prop_average_diffs)
+                f.write('average prop diffs:\n')
+                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
+                for i in range(len(res_prop_average_diffs)):
+                    for j in range(len(res_prop_average_diffs[i])):
+                        f.write(str(res_prop_average_diffs[i][j])+', ')
+                    f.write('\n')
+                f.write('\n')
+                print(res_inner_average_diffs)
+                f.write('average inner diffs:\n')
+                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
+                for i in range(len(res_inner_average_diffs)):
+                    for j in range(len(res_inner_average_diffs[i])):
+                        f.write(str(res_inner_average_diffs[i][j])+', ')
+                    f.write('\n')
+                f.write('\n')
+                print(res_total_average_diffs)
+                f.write('average total diffs:\n')
+                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
+                for i in range(len(res_total_average_diffs)):
+                    for j in range(len(res_total_average_diffs[i])):
+                        f.write(str(res_total_average_diffs[i][j])+', ')
+                    f.write('\n')
+                f.write('\n')
 
-
-compare_sides = CompareSides('probe_side', 'contralateral', ['GFAP', 'IBA1'], ['2weekDummy', '2weekGraphene', '6weekDummy'])
+            
+m1 = Metric('inner_intensity', inner_intensity)
+m2 = Metric('prop', prop)
+compare_sides = CompareSides('probe_side', 'contralateral', ['GFAP', 'IBA1'], ['2weekDummy', '2weekGraphene', '6weekDummy', '6weekGraphene', '12weekDummy', '12weekGraphene'])
 compare_sides.run()
 compare_sides.perform_comparison()
 compare_sides.output_result('test')
+
+# now need to do same for neun.... needs to be a better structure to support multiple metrics
+
+
 
 
 
