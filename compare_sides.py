@@ -44,10 +44,10 @@ class Animal:
         im = Image.open(file_path).convert('L')
         data = np.array(im, dtype=float)
         norm = preprocessing.normalize(im, norm='l2')
-        for metric in self.result.metrics:
+        for i, metric in enumerate(self.result.metrics):
             res = metric.function(norm)
             self.result.results[i].append(res)
-        print('results for %s: inner intensity %d, total intensity %d, prop %f' % (filename, inner_intensity, total_intensity, prop))
+            print('results for %s metric %d: %d' % (filename, res))
 
     def analyse_images(self):
         print('analysing animal %s' % (self.name))
@@ -80,6 +80,7 @@ class Stain:
                     print(animals[condition].keys())
                     if animal_name not in animals[condition].keys():
                         animals[condition][animal_name] = {}
+                    # shouldn't actually need to wire metrics through everything like this
                     animal = Animal(folder_path, animal_name, self.list_of_metrics)
                     animals[condition][animal_name][folder] = animal
             print(animals)
@@ -125,7 +126,7 @@ class CompareSides:
     def create_stains(self):
         stains = []
         for stain in self.list_of_stain_names:
-            stains.append(Stain([self.folder_side_one, self.folder_side_two], stain, self.list_of_conditions))
+            stains.append(Stain([self.folder_side_one, self.folder_side_two], stain, self.list_of_conditions, self.list_of_metrics))
         self.stains = stains
 
     def run(self):
@@ -263,7 +264,8 @@ class CompareSides:
             
 m1 = Metric('inner_intensity', inner_intensity)
 m2 = Metric('prop', prop)
-compare_sides = CompareSides('probe_side', 'contralateral', ['GFAP', 'IBA1'], ['2weekDummy', '2weekGraphene', '6weekDummy', '6weekGraphene', '12weekDummy', '12weekGraphene'])
+metrics = [m1, m2]
+compare_sides = CompareSides('probe_side', 'contralateral', ['GFAP', 'IBA1'], ['2weekDummy', '2weekGraphene', '6weekDummy', '6weekGraphene', '12weekDummy', '12weekGraphene'],[m1, m2])
 compare_sides.run()
 compare_sides.perform_comparison()
 compare_sides.output_result('test')
