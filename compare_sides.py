@@ -47,7 +47,7 @@ class Animal:
         for i, metric in enumerate(self.result.metrics):
             res = metric.function(norm)
             self.result.results[i].append(res)
-            print('results for %s metric %d: %d' % (filename, res))
+            print('results for %s metric %d: %f' % (filename, i, res))
 
     def analyse_images(self):
         print('analysing animal %s' % (self.name))
@@ -104,8 +104,8 @@ class Metric:
     def write_output_string(self, header, data):
         ''' convert data to string to write to results csv '''
         res = list(map(list, zip_longest(*data)))
-        out_str = 'prop diffs:\n'
-        out_str += '2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n'
+        out_str = self.name + '\n'
+        out_str += header
         for i in range(len(res)):
             for j in range(len(res[i])):
                 out_str += str(res[i][j])+', '
@@ -113,7 +113,13 @@ class Metric:
         out_str +='\n'
         return out_str
 
-# try again but with stain helper class
+class ComparisonResult:
+    def __init__(self, name):
+        self.name = name
+        self.diffs = {}
+        self.average_diffs = {}
+
+
 class CompareSides:
     def __init__(self, folder_side_one, folder_side_two, list_of_stain_names, list_of_conditions, list_of_metrics):
         self.folder_side_one = folder_side_one
@@ -147,128 +153,70 @@ class CompareSides:
                     if len(stain.animals[condition][animal].keys()) == 2:
                         side1 = self.folder_side_one
                         side2 = self.folder_side_two
+                        res = ComparisonResult(animal)
                         print(stain.animals[condition][animal][side1].samples)
                         animal_side1 = stain.animals[condition][animal][side1]
                         animal_side2 = stain.animals[condition][animal][side2]
                         side1_samples = animal_side1.samples
                         side2_samples = animal_side2.samples
+                        result1 = stain.animals[condition][animal][side1].result
+                        result2 = stain.animals[condition][animal][side2].result
+                        diffs = {}
                         for i, sample in enumerate(side1_samples):
                             if sample in side2_samples:
                                 print(sample)
                                 j = side2_samples.index(sample)
-                                result1 = stain.animals[condition][animal][side1].result
-                                result2 = stain.animals[condition][animal][side2].result
-                                total_intensity_diff = result1.total_intensities[i] - result2.total_intensities[j]
-                                inner_intensity_diff = result1.inner_intensities[i] - result2.inner_intensities[j]
-                                prop_diff = result1.props[i] - result2.props[j]
-                                res.total_intensity_diffs[sample] = total_intensity_diff
-                                res.inner_intensity_diffs[sample] = inner_intensity_diff
-                                res.prop_diffs[sample] = prop_diff
-                        total_averaged_diff = result1.total_averaged - result2.total_averaged
-                        inner_averaged_diff = result1.inner_averaged - result2.inner_averaged
-                        prop_averaged_diff = result1.prop_averaged - result2.prop_averaged
-                        res.average_total_intensity_diff = total_averaged_diff
-                        res.average_inner_intensity_diff = inner_averaged_diff
-                        res.average_prop = prop_averaged_diff
+                                diffs_for_sample = {}
+                                for k, metric in enumerate(result1.metrics):
+                                    diff = result1.results[k][i] - result2.results[k][j]
+                                    diffs_for_sample[metric.name] = diff
+                                diffs[sample] = diffs_for_sample
+                        print("diffs: ", diffs)
+                        average_diffs = {}
+                        for i in range(len(result1.metrics)):
+                            average_diffs[result1.metrics[i].name] = result1.results_averaged[i] - result2.results_averaged[i]
+                        print("average diffs: ", average_diffs)
+                        res.diffs = diffs
+                        res.average_diffs = average_diffs
                         final[stain.name][condition][animal] = res
         self.final = final
+        print(final)
 
     def output_result(self, out_filename_base):
         for stain in self.list_of_stain_names:
             stain_res = self.final[stain]
             print("stain res")
             print(stain_res)
+            output_string = ''
             # create array of values to output
-            res_prop_diffs = [[] for i in range(len(stain_res.keys()))]
-            res_inner_diffs = [[] for i in range(len(stain_res.keys()))]
-            res_total_diffs = [[] for i in range(len(stain_res.keys()))]
-            res_prop_average_diffs = [[] for i in range(len(stain_res.keys()))]
-            res_inner_average_diffs = [[] for i in range(len(stain_res.keys()))]
-            res_total_average_diffs = [[] for i in range(len(stain_res.keys()))]
-            for i, condition in enumerate(stain_res.keys()):
-                condition_res = stain_res[condition]
-                for animal in condition_res.keys():
-                    animal_res = condition_res[animal]
-                    for sample in animal_res.prop_diffs.values():
-                        res_prop_diffs[i].append(sample)
-                    for sample in animal_res.inner_intensity_diffs.values():
-                        res_inner_diffs[i].append(sample)
-                    for sample in animal_res.total_intensity_diffs.values():
-                        res_total_diffs[i].append(sample)
-                    res_prop_average_diffs[i].append(animal_res.average_prop)  
-                    res_inner_average_diffs[i].append(animal_res.average_inner_intensity_diff)  
-                    res_total_average_diffs[i].append(animal_res.average_total_intensity_diff)                
+            for metric in self.list_of_metrics:
+                res = [[] for i in range(len(stain_res.keys()))]
+                res_averages = [[] for i in range(len(stain_res.keys()))]
+                for i, condition in enumerate(stain_res.keys()):
+                    condition_res = stain_res[condition]
+                    for animal in condition_res.keys():
+                        animal_res = condition_res[animal]
+                        print(i)
+                        print(animal_res.diffs)
+                        for sample, results in animal_res.diffs.items():
+                            print(sample)
+                            res[i].append(results[metric.name])
+                        res_averages[i].append(animal_res.average_diffs[metric.name])
+                output_string += metric.write_output_string(res)
+                output_string += metric.write_output_string(res_averages)
             out_filename = out_filename_base + '_' + stain + '.csv'           
-            print(res_prop_diffs)
-            print(len(res_prop_diffs))
-            print(len(res_prop_diffs[0]))
-            res_prop_diffs = list(map(list, zip_longest(*res_prop_diffs)))
-            res_inner_diffs = list(map(list, zip_longest(*res_inner_diffs)))
-            res_total_diffs = list(map(list, zip_longest(*res_total_diffs)))
-            res_prop_average_diffs = list(map(list, zip_longest(*res_prop_average_diffs)))
-            res_inner_average_diffs = list(map(list, zip_longest(*res_inner_average_diffs)))
-            res_total_average_diffs = list(map(list, zip_longest(*res_total_average_diffs)))
-            print(len(res_prop_diffs))
-            print(len(res_prop_diffs[0]))
-            # need to output csv in format ready for estimation stats.
             with open(out_filename, 'w') as f:
-                print(res_prop_diffs)
-                f.write('prop diffs:\n')
-                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
-                for i in range(len(res_prop_diffs)):
-                    for j in range(len(res_prop_diffs[i])):
-                        f.write(str(res_prop_diffs[i][j])+', ')
-                    f.write('\n')
-                f.write('\n')
-                print(res_inner_diffs)
-                f.write('inner diffs:\n')
-                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
-                for i in range(len(res_inner_diffs)):
-                    for j in range(len(res_inner_diffs[i])):
-                        f.write(str(res_inner_diffs[i][j])+', ')
-                    f.write('\n')
-                f.write('\n')
-                print(res_total_diffs)
-                f.write('total diffs:\n')
-                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
-                for i in range(len(res_total_diffs)):
-                    for j in range(len(res_total_diffs[i])):
-                        f.write(str(res_total_diffs[i][j])+', ')
-                    f.write('\n')
-                f.write('\n')
-                print(res_prop_average_diffs)
-                f.write('average prop diffs:\n')
-                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
-                for i in range(len(res_prop_average_diffs)):
-                    for j in range(len(res_prop_average_diffs[i])):
-                        f.write(str(res_prop_average_diffs[i][j])+', ')
-                    f.write('\n')
-                f.write('\n')
-                print(res_inner_average_diffs)
-                f.write('average inner diffs:\n')
-                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
-                for i in range(len(res_inner_average_diffs)):
-                    for j in range(len(res_inner_average_diffs[i])):
-                        f.write(str(res_inner_average_diffs[i][j])+', ')
-                    f.write('\n')
-                f.write('\n')
-                print(res_total_average_diffs)
-                f.write('average total diffs:\n')
-                f.write('2 wk dummy, 2 wk graphene, 6 wk dummy, 6 wk graphene, 12 wk dummy, 12 wk graphene\n')
-                for i in range(len(res_total_average_diffs)):
-                    for j in range(len(res_total_average_diffs[i])):
-                        f.write(str(res_total_average_diffs[i][j])+', ')
-                    f.write('\n')
-                f.write('\n')
-
+                f.write(output_string)
             
 m1 = Metric('inner_intensity', inner_intensity)
 m2 = Metric('prop', prop)
 metrics = [m1, m2]
-compare_sides = CompareSides('probe_side', 'contralateral', ['GFAP', 'IBA1'], ['2weekDummy', '2weekGraphene', '6weekDummy', '6weekGraphene', '12weekDummy', '12weekGraphene'],[m1, m2])
+compare_sides_full = CompareSides('probe_side', 'contralateral', ['GFAP', 'IBA1'], ['2weekDummy', '2weekGraphene', '6weekDummy', '6weekGraphene', '12weekDummy', '12weekGraphene'],[m1, m2])
+
+compare_sides = CompareSides('probe_side', 'contralateral', ['GFAP', 'IBA1'], ['2weekDummy', '2weekGraphene'],[m1, m2])
 compare_sides.run()
 compare_sides.perform_comparison()
-compare_sides.output_result('test')
+compare_sides.output_result('test2')
 
 # now need to do same for neun.... needs to be a better structure to support multiple metrics
 
